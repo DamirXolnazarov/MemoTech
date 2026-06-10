@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --orchid: #c96acb;
+  --orchid-dim: rgba(201, 106, 203, 0.12);
+  --orchid-glow: rgba(201, 106, 203, 0.3);
+  --bg: #050505;
+  --card-bg: rgba(11, 11, 11, 0.72);
+  --card-glass: rgba(14, 14, 14, 0.6);
+  --border: rgba(26, 26, 26, 0.9);
+  --border-bright: #2a2a2a;
+  --text: #ffffff;
+  --text-2: #a1a1aa;
+  --text-3: #52525b;
+  --font-syne: 'Syne', sans-serif;
+  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: #050505;
+  color: #ffffff;
+  font-family: var(--font-inter);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #050505; }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+::selection { background: rgba(201,106,203,0.15); color: #c96acb; }
