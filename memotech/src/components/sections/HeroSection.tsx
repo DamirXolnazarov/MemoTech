@@ -1,197 +1,525 @@
 "use client";
+
 import { useEffect, useRef } from "react";
-import { gsap } from "gsap";
+import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { Button } from "@/components/ui/Button";
 
 gsap.registerPlugin(ScrollTrigger);
 
-const FEAT_LABELS = ["Summary", "Tasks", "Key Points", "Flashcards", "Recall"];
+const ORCHID = "#c96acb";
 
+/* ─── Demo cards ─────────────────────────────────────────────────────────── */
+const CARDS = [
+  {
+    label: "Summary",
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={ORCHID} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+    ),
+    body: "Team agreed to delay launch to Q2. Stakeholders aligned on revised timeline and budget.",
+  },
+  {
+    label: "Tasks",
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={ORCHID} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="9 11 12 14 22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    ),
+    body: "✓ Update roadmap  ○ Email stakeholders  ○ Review budget",
+  },
+  {
+    label: "Key Points",
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={ORCHID} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    ),
+    body: "• Budget increased 15%  • New PM assigned  • Beta ships March",
+  },
+  {
+    label: "Flashcards",
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={ORCHID} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2"/>
+        <line x1="8" y1="21" x2="16" y2="21"/>
+        <line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+    ),
+    body: "Q: New ship date? → A: Q2, April window.",
+  },
+  {
+    label: "Recall",
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={ORCHID} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    ),
+    body: "\"Vendors?\" — 3 months ago, shortlist narrowed to two finalists.",
+  },
+];
+
+/* ─── Person silhouette (white, side-profile facing right) ───────────────── */
+function PersonSVG({ wrapRef }: { wrapRef: React.RefObject<HTMLDivElement> }) {
+  return (
+    <div
+      ref={wrapRef}
+      style={{
+        position: "absolute",
+        left: "3vw",
+        top: "50%",
+        transform: "translateY(-52%)",
+        zIndex: 6,
+        pointerEvents: "none",
+        opacity: 0,
+      }}
+    >
+      <svg
+        width="300"
+        height="420"
+        viewBox="0 0 300 420"
+        fill="white"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* Traced from reference: 3/4 rear-facing person. Round head, bun, narrow neck, wide shoulders, bent arm. */}
+
+        {/* Main head — large round */}
+        <ellipse cx="168" cy="108" rx="82" ry="90" />
+
+        {/* Hair bun — small circle left of head */}
+        <circle cx="90" cy="130" r="24" />
+
+        {/* Chin / lower face taper */}
+        <path d="M118 185 C118 200 130 215 148 220 C164 224 178 216 182 202 C186 190 182 178 175 172 L160 168 C144 165 118 172 118 185Z" />
+
+        {/* Beard / jaw detail under chin */}
+        <path d="M128 210 C125 222 128 235 138 240 C148 244 160 240 165 230 C168 222 165 212 158 208Z" />
+
+        {/* Neck — narrow strip */}
+        <rect x="138" y="240" width="34" height="36" rx="6" />
+
+        {/* Collar piece */}
+        <rect x="126" y="270" width="58" height="22" rx="4" />
+
+        {/* Left shoulder + torso */}
+        <path d="M30 320 C20 310 15 295 20 280 C26 262 50 250 80 248 L130 245 C130 258 132 268 136 278 L136 420 L10 420Z" />
+
+        {/* Right shoulder */}
+        <path d="M196 278 C200 265 220 252 248 250 C270 248 288 256 294 268 C298 278 295 290 286 296 L240 308 C220 314 200 306 196 292Z" />
+
+        {/* Right arm — bent elbow */}
+        <path d="M268 296 C285 300 298 312 300 328 C302 342 295 355 283 360 C270 364 256 356 248 344 L240 320 C244 306 256 292 268 296Z" />
+
+        {/* Forearm resting */}
+        <path d="M225 358 C238 355 255 356 265 362 C278 370 282 384 274 392 C265 400 248 398 236 390 L218 374 C214 364 220 360 225 358Z" />
+
+        {/* Central torso fill */}
+        <rect x="136" y="278" width="60" height="142" />
+
+      </svg>
+    </div>
+  );
+}
+
+/* ─── Mouth sound waves — arcs radiating from person's mouth area ─────────── */
+function MouthWaves({ containerRef, waveRefs }: {
+  containerRef: React.RefObject<SVGGElement>;
+  waveRefs: React.MutableRefObject<SVGPathElement[]>;
+}) {
+  // Three arc waves, centered around mouth position (~310px from left, 50% height)
+  // Each arc opens rightward toward the mic
+  const arcs = [
+    "M 0,-22 A 22,22 0 0,1 0,22",
+    "M 0,-40 A 40,40 0 0,1 0,40",
+    "M 0,-60 A 60,60 0 0,1 0,60",
+    "M 0,-82 A 82,82 0 0,1 0,82",
+    "M 0,-106 A 106,106 0 0,1 0,106",
+  ];
+  return (
+    <svg
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 5, overflow: "visible" }}
+      viewBox="0 0 1440 900"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      {/* mouth origin: x≈310 (person right edge + slight offset), y≈450 (vertical center) */}
+      <g ref={containerRef} transform="translate(310,450)">
+        {arcs.map((d, i) => (
+          <path
+            key={i}
+            ref={(el) => { if (el) waveRefs.current[i] = el; }}
+            d={d}
+            fill="none"
+            stroke={ORCHID}
+            strokeWidth={2.4 - i * 0.3}
+            strokeLinecap="round"
+            opacity={0}
+          />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+/* ─── Mic SVG ────────────────────────────────────────────────────────────── */
+function MicSVG({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }) {
+  return (
+    <svg ref={svgRef} width="100" height="128" viewBox="0 0 100 128" fill="none" style={{ overflow: "visible" }}>
+      <rect x="30" y="4" width="40" height="60" rx="20" fill="white" />
+      <line x1="30" y1="26" x2="70" y2="26" stroke="#050505" strokeWidth="2" strokeLinecap="round" opacity={0.3} />
+      <line x1="30" y1="36" x2="70" y2="36" stroke="#050505" strokeWidth="2" strokeLinecap="round" opacity={0.3} />
+      <line x1="30" y1="46" x2="70" y2="46" stroke="#050505" strokeWidth="2" strokeLinecap="round" opacity={0.3} />
+      <path d="M14 50 Q14 88 50 88 Q86 88 86 50" stroke="white" strokeWidth="4" strokeLinecap="round" fill="none" />
+      <line x1="50" y1="88" x2="50" y2="110" stroke="white" strokeWidth="4" strokeLinecap="round" />
+      <line x1="26" y1="110" x2="74" y2="110" stroke="white" strokeWidth="4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/* ─── Concentric circles radiating in ALL directions from mic center ─────── */
+function RadialCircles({ circleRefs }: {
+  circleRefs: React.MutableRefObject<SVGCircleElement[]>;
+}) {
+  const radii = [55, 100, 155, 215, 285, 360];
+  return (
+    <svg
+      viewBox="0 0 1440 900"
+      preserveAspectRatio="xMidYMid slice"
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 3, overflow: "visible" }}
+    >
+      {/* mic center ≈ 720, 440 in 1440×900 viewport space */}
+      <g transform="translate(720,440)">
+        {radii.map((r, i) => (
+          <circle
+            key={i}
+            ref={(el) => { if (el) circleRefs.current[i] = el; }}
+            cx={0} cy={0} r={r}
+            fill="none"
+            stroke={ORCHID}
+            strokeWidth={1.8 - i * 0.2}
+            opacity={0}
+          />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+/* ─── Demo cards fanned out ──────────────────────────────────────────────── */
+const CARD_POSITIONS = [
+  { left: "18%", top: "18%" },
+  { left: "38%", top: "8%"  },
+  { left: "58%", top: "8%"  },
+  { left: "76%", top: "18%" },
+  { left: "78%", top: "62%" },
+];
+
+function DemoCards({ wrapRef, cardRefs }: {
+  wrapRef: React.RefObject<HTMLDivElement>;
+  cardRefs: React.MutableRefObject<HTMLDivElement[]>;
+}) {
+  return (
+    <div ref={wrapRef} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 9, opacity: 0 }}>
+      {CARDS.map((card, i) => (
+        <div
+          key={card.label}
+          ref={(el) => { if (el) cardRefs.current[i] = el; }}
+          style={{
+            position: "absolute",
+            left: CARD_POSITIONS[i].left,
+            top: CARD_POSITIONS[i].top,
+            width: 185,
+            background: "rgba(8,8,8,0.88)",
+            border: "1px solid rgba(201,106,203,0.28)",
+            borderRadius: 14,
+            padding: "14px 16px",
+            backdropFilter: "blur(14px)",
+            opacity: 0,
+            boxShadow: "0 0 28px rgba(201,106,203,0.07)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "var(--font-syne, Syne, sans-serif)", fontWeight: 700, fontSize: 12, color: ORCHID, letterSpacing: "0.06em", marginBottom: 8 }}>
+            {card.icon}
+            {card.label}
+          </div>
+          <p style={{ fontSize: 11, lineHeight: 1.65, color: "#a1a1aa", margin: 0 }}>
+            {card.body}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Main export ────────────────────────────────────────────────────────── */
 export function HeroSection() {
-  const outerRef = useRef<HTMLDivElement>(null);
-  const micRef = useRef<HTMLDivElement>(null);
-  const humanRef = useRef<SVGSVGElement>(null);
-  const mouthRef = useRef<SVGPathElement>(null);
-  const chopperwrapRef = useRef<HTMLDivElement>(null);
-  const chopperLineRef = useRef<HTMLDivElement>(null);
-  const featStageRef = useRef<HTMLDivElement>(null);
-  const headlineRef = useRef<HTMLDivElement>(null);
-  const ctasRef = useRef<HTMLDivElement>(null);
-  const scrollIndRef = useRef<HTMLDivElement>(null);
-  const ringsRef = useRef<HTMLDivElement[]>([]);
-  const hwavesRef = useRef<HTMLDivElement[]>([]);
-  const particlesRef = useRef<HTMLDivElement[]>([]);
-  const splatRef = useRef<HTMLDivElement[]>([]);
-  const dropRefs = useRef<HTMLDivElement[]>([]);
-  const labelRefs = useRef<HTMLDivElement[]>([]);
+  const wrapperRef      = useRef<HTMLDivElement>(null);
+  const micWrapRef      = useRef<HTMLDivElement>(null);
+  const micSvgRef       = useRef<SVGSVGElement>(null);
+  const personWrapRef   = useRef<HTMLDivElement>(null);
+  const mouthWaveGroup  = useRef<SVGGElement>(null);
+  const mouthWaveRefs   = useRef<SVGPathElement[]>([]);
+  const circleRefs      = useRef<SVGCircleElement[]>([]);
+  const cardsWrapRef    = useRef<HTMLDivElement>(null);
+  const cardRefs        = useRef<HTMLDivElement[]>([]);
+  const headlineRef     = useRef<HTMLDivElement>(null);
+  const indicatorRef    = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const ctx = gsap.context(() => {
+    const gsapCtx = gsap.context(() => {
       const tl = gsap.timeline({
         scrollTrigger: {
-          trigger: outerRef.current,
+          trigger: wrapperRef.current,
           start: "top top",
           end: "bottom bottom",
-          scrub: 1.2,
-          onUpdate: (self) => {
-            if (!scrollIndRef.current) return;
-            gsap.to(scrollIndRef.current, { opacity: self.progress > 0.04 ? 0 : 1, duration: 0.3 });
-          },
+          scrub: 1.4,
         },
       });
 
-      ringsRef.current.forEach((r, i) => {
-        tl.to(r, { scale: 3.5, opacity: 0, duration: 0.15, ease: "power2.out" }, i * 0.02);
+      /* ── Phase 1 (0 → 0.10): Person visible, mic visible, scroll hint fades ── */
+      tl.to(indicatorRef.current, { opacity: 0, duration: 0.06 }, 0.04);
+
+      /* ── Phase 2 (0.10 → 0.38): Person slides in from left, mouth arc waves travel to mic ── */
+      // Person slides in from off-screen left
+      tl.fromTo(personWrapRef.current,
+        { opacity: 0, x: -80 },
+        { opacity: 1, x: 0, duration: 0.14, ease: "power3.out" },
+        0.10
+      );
+
+      mouthWaveRefs.current.forEach((w, i) => {
+        const start = 0.08 + i * 0.028;
+        tl.fromTo(w,
+          { opacity: 0, scale: 0.4, transformOrigin: "0px 0px" },
+          { opacity: 0.75 - i * 0.1, scale: 1, transformOrigin: "0px 0px", duration: 0.10, ease: "power2.out" },
+          start
+        );
+        tl.to(w, { opacity: 0, duration: 0.07, ease: "power2.in" }, start + 0.14);
       });
-      tl.fromTo(humanRef.current, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.1 }, 0.1);
-      tl.to(mouthRef.current, { attr: { d: "M22 19 Q30 27 38 19" }, duration: 0.07 }, 0.16);
-      hwavesRef.current.forEach((w, i) => {
-        tl.fromTo(w, { opacity: 0, scaleX: 0 }, { opacity: 1, scaleX: 1, duration: 0.08, ease: "power2.out" }, 0.2 + i * 0.012);
-        tl.to(w, { x: 200, opacity: 0, duration: 0.1, ease: "power2.in" }, 0.29 + i * 0.012);
+
+      /* ── Phase 3 (0.36 → 0.55): Person fades, mic zooms, circles burst out ── */
+      tl.to(personWrapRef.current, { opacity: 0, x: -60, duration: 0.10, ease: "power2.in" }, 0.36);
+
+      tl.to(micWrapRef.current, {
+        scale: 2.8,
+        duration: 0.16,
+        ease: "power3.inOut",
+        transformOrigin: "50% 50%",
+      }, 0.38);
+
+      // Circles burst outward in all directions, staggered
+      circleRefs.current.forEach((c, i) => {
+        tl.fromTo(c,
+          { attr: { r: 0 }, opacity: 0.7 - i * 0.08 },
+          { attr: { r: 55 + i * 72 }, opacity: 0.55 - i * 0.08, duration: 0.14, ease: "power2.out" },
+          0.40 + i * 0.022
+        );
       });
-      tl.to(humanRef.current, { opacity: 0, x: -40, duration: 0.08 }, 0.36);
-      tl.to(micRef.current, { scale: 2.6, duration: 0.14, ease: "power3.inOut" }, 0.38);
-      ringsRef.current.forEach((r, i) => {
-        tl.fromTo(r, { scale: 0.7, opacity: 0.85 }, { scale: 5, opacity: 0, duration: 0.1, ease: "power2.out" }, 0.38 + i * 0.022);
+
+      /* ── Phase 4 (0.58 → 0.78): Zoom into mic+circles, mic fades, circles fill screen ── */
+      tl.to(micWrapRef.current, {
+        scale: 7,
+        opacity: 0,
+        duration: 0.16,
+        ease: "power3.in",
+        transformOrigin: "50% 50%",
+      }, 0.58);
+
+      // Circles keep expanding while zooming in — scale the whole SVG layer
+      tl.to(".radial-circles-svg", {
+        scale: 3.2,
+        transformOrigin: "50% 49%",
+        duration: 0.18,
+        ease: "power3.in",
+      }, 0.58);
+
+      /* ── Phase 5 (0.72 → 0.88): Cards appear through the waves ── */
+      tl.to(cardsWrapRef.current, { opacity: 1, duration: 0.04 }, 0.72);
+      cardRefs.current.forEach((card, i) => {
+        tl.fromTo(card,
+          { opacity: 0, scale: 0.88, y: 16 },
+          { opacity: 1, scale: 1, y: 0, duration: 0.08, ease: "back.out(1.5)" },
+          0.74 + i * 0.030
+        );
       });
-      particlesRef.current.forEach((p) => {
-        tl.to(p, { opacity: Math.random() * 0.4 + 0.1, duration: 0.06 }, 0.44);
-      });
-      tl.to(micRef.current, { scale: 1, opacity: 0.2, duration: 0.07 }, 0.53);
-      tl.to(chopperwrapRef.current, { opacity: 1, duration: 0.02 }, 0.55);
-      tl.fromTo(chopperLineRef.current, { left: "-100%" }, { left: "110%", duration: 0.1, ease: "power3.inOut" }, 0.56);
-      tl.fromTo(chopperLineRef.current, { left: "-100%" }, { left: "110%", duration: 0.08, ease: "power2.inOut" }, 0.69);
-      tl.to(chopperwrapRef.current, { opacity: 0, duration: 0.02 }, 0.78);
-      splatRef.current.forEach((d, i) => {
-        const angle = (i / splatRef.current.length) * Math.PI * 2;
-        const dist = 50 + Math.random() * 120;
-        tl.fromTo(d, { opacity: 1, x: 0, y: 0, scale: 0 }, { opacity: 0, x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, scale: 1.5 + Math.random(), duration: 0.1 }, 0.78);
-      });
-      particlesRef.current.forEach((p) => { tl.to(p, { opacity: 0, duration: 0.06 }, 0.79); });
-      tl.to(micRef.current, { opacity: 0, scale: 0.7, duration: 0.06 }, 0.81);
-      tl.to(featStageRef.current, { opacity: 1, duration: 0.03 }, 0.83);
-      dropRefs.current.forEach((d, i) => {
-        const t = 0.84 + i * 0.024;
-        tl.to(d, { opacity: 1, y: 0, scaleY: 1.5, scaleX: 0.7, duration: 0.04, ease: "power2.out" }, t);
-        tl.to(d, { scaleY: 0.35, scaleX: 3.5, opacity: 0.4, duration: 0.025 }, t + 0.04);
-        tl.to(d, { scaleX: 0, opacity: 0, duration: 0.02 }, t + 0.065);
-      });
-      labelRefs.current.forEach((l, i) => { tl.to(l, { opacity: 1, y: 0, duration: 0.05 }, 0.865 + i * 0.024); });
-      tl.to(featStageRef.current, { opacity: 0, y: 24, duration: 0.05 }, 0.93);
-      tl.to(headlineRef.current, { opacity: 1, duration: 0.06, ease: "power2.out" }, 0.94);
-      tl.to(ctasRef.current, { opacity: 1, duration: 0.05 }, 0.97);
-    });
-    return () => ctx.revert();
+
+      /* ── Phase 6 (0.88 → 1.0): Cards + circles out, headline in ── */
+      tl.to([cardsWrapRef.current, ".radial-circles-svg"], { opacity: 0, duration: 0.07 }, 0.88);
+      tl.fromTo(headlineRef.current,
+        { opacity: 0, y: 28 },
+        { opacity: 1, y: 0, duration: 0.07, ease: "power2.out" },
+        0.93
+      );
+    }, wrapperRef);
+
+    return () => gsapCtx.revert();
   }, []);
 
   return (
-    <div ref={outerRef} style={{ height: "600vh" }}>
-      <div className="sticky top-0 h-screen w-full overflow-hidden flex items-center justify-center" style={{ background: "rgba(0,0,0,0.94)" }}>
+    <div ref={wrapperRef} style={{ height: "700vh", position: "relative" }}>
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+          width: "100%",
+          background: "#050505",
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {/* Person — visible from frame 1, left side */}
+        <PersonSVG wrapRef={personWrapRef} />
 
-        {/* Scroll indicator */}
-        <div ref={scrollIndRef} className="absolute bottom-9 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none z-10">
-          <span className="text-[11px] uppercase tracking-[0.2em] text-[#52525b]">Scroll</span>
-          <div className="w-5 h-5 border-r border-b border-[#52525b] rotate-45" style={{ animation: "arrowBounce 1.8s ease-in-out infinite" }} />
+        {/* Mouth arc waves */}
+        <MouthWaves containerRef={mouthWaveGroup} waveRefs={mouthWaveRefs} />
+
+        {/* Mic — centered */}
+        <div
+          ref={micWrapRef}
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -52%)",
+            zIndex: 5,
+            pointerEvents: "none",
+          }}
+        >
+          <MicSVG svgRef={micSvgRef} />
         </div>
 
-        {/* Particles */}
-        <div className="absolute inset-0 pointer-events-none">
-          {Array.from({ length: 60 }).map((_, i) => (
-            <div key={i} ref={(el) => { if (el) particlesRef.current[i] = el; }}
-              className="absolute rounded-full bg-[#c96acb] opacity-0"
-              style={{ width: `${1 + Math.random() * 2}px`, height: `${1 + Math.random() * 2}px`, left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }} />
-          ))}
-        </div>
+        {/* Radial circles — all directions */}
+        <RadialCircles circleRefs={circleRefs} />
 
-        {/* Human */}
-        <svg ref={humanRef} viewBox="0 0 60 120" fill="none" xmlns="http://www.w3.org/2000/svg"
-          className="absolute opacity-0"
-          style={{ width: "80px", left: "calc(50% - 240px)", top: "50%", transform: "translateY(-50%)" }}>
-          <circle cx="30" cy="15" r="12" fill="rgba(255,255,255,0.92)" />
-          <path ref={mouthRef} d="M22 19 Q30 22 38 19" stroke="#000" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-          <rect x="15" y="30" width="30" height="38" rx="9" fill="rgba(255,255,255,0.88)" />
-          <rect x="3" y="32" width="13" height="26" rx="6" fill="rgba(255,255,255,0.72)" />
-          <rect x="44" y="32" width="13" height="26" rx="6" fill="rgba(255,255,255,0.72)" />
-          <rect x="17" y="68" width="11" height="32" rx="5" fill="rgba(255,255,255,0.75)" />
-          <rect x="32" y="68" width="11" height="32" rx="5" fill="rgba(255,255,255,0.75)" />
-        </svg>
+        {/* Demo cards */}
+        <DemoCards wrapRef={cardsWrapRef} cardRefs={cardRefs} />
 
-        {/* Human waves */}
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} ref={(el) => { if (el) hwavesRef.current[i] = el; }}
-            className="absolute h-[1.5px] rounded-full bg-[#c96acb] opacity-0 origin-left"
-            style={{ width: `${24 + i * 18}px`, left: "calc(50% - 215px)", top: `calc(50% + ${(i - 2) * 16}px)` }} />
-        ))}
-
-        {/* Mic */}
-        <div ref={micRef} className="absolute flex flex-col items-center z-20">
-          <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "72px", height: "72px" }}>
-            <rect x="24" y="8" width="24" height="36" rx="12" fill="white" />
-            <path d="M14 34C14 48 58 48 58 34" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-            <line x1="36" y1="48" x2="36" y2="60" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-            <line x1="24" y1="60" x2="48" y2="60" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-          <div className="absolute inset-0">
-            {Array.from({ length: 5 }).map((_, i) => {
-              const s = 80 + i * 56;
-              return (
-                <div key={i} ref={(el) => { if (el) ringsRef.current[i] = el; }}
-                  className="absolute rounded-full opacity-0"
-                  style={{ width: `${s}px`, height: `${s}px`, left: `${36 - s / 2}px`, top: `${36 - s / 2}px`, border: "1px solid rgba(201,106,203,0.45)" }} />
-              );
-            })}
+        {/* Final headline */}
+        <div
+          ref={headlineRef}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 22,
+            opacity: 0,
+            zIndex: 15,
+            textAlign: "center",
+            padding: "0 24px",
+            pointerEvents: "none",
+          }}
+        >
+          <h1
+            style={{
+              fontFamily: "var(--font-syne, Syne, sans-serif)",
+              fontWeight: 800,
+              fontSize: "clamp(2.8rem, 5.5vw, 5rem)",
+              lineHeight: 1.07,
+              letterSpacing: "-0.02em",
+              color: "white",
+            }}
+          >
+            Never lose
+            <br />
+            what <span style={{ color: ORCHID }}>matters.</span>
+          </h1>
+          <p
+            style={{
+              fontFamily: "var(--font-inter, Inter, sans-serif)",
+              fontSize: "clamp(0.95rem, 1.4vw, 1.1rem)",
+              color: "#a1a1aa",
+              maxWidth: 420,
+              lineHeight: 1.65,
+            }}
+          >
+            MemoTech listens, understands, and surfaces exactly what you need —
+            the moment you need it.
+          </p>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", pointerEvents: "all" }}>
+            <button
+              style={{
+                background: ORCHID,
+                color: "white",
+                border: "none",
+                borderRadius: 9,
+                padding: "13px 28px",
+                fontFamily: "var(--font-inter, Inter, sans-serif)",
+                fontWeight: 600,
+                fontSize: "0.95rem",
+                cursor: "pointer",
+              }}
+            >
+              Get started free
+            </button>
+            <button
+              style={{
+                background: "transparent",
+                color: "white",
+                border: "1.5px solid rgba(255,255,255,0.2)",
+                borderRadius: 9,
+                padding: "12px 28px",
+                fontFamily: "var(--font-inter, Inter, sans-serif)",
+                fontWeight: 500,
+                fontSize: "0.95rem",
+                cursor: "pointer",
+              }}
+            >
+              See how it works
+            </button>
           </div>
         </div>
 
-        {/* Chopper */}
-        <div ref={chopperwrapRef} className="absolute inset-0 pointer-events-none opacity-0 overflow-hidden">
-          <div ref={chopperLineRef} className="absolute top-1/2 h-[1px]"
-            style={{ left: "-100%", width: "100%", background: "linear-gradient(90deg, transparent, #c96acb 40%, #fff 50%, #c96acb 60%, transparent)", boxShadow: "0 0 10px #c96acb" }} />
+        {/* Scroll indicator */}
+        <div
+          ref={indicatorRef}
+          style={{
+            position: "absolute",
+            bottom: 28,
+            left: "50%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 8,
+            zIndex: 20,
+            pointerEvents: "none",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-inter, Inter, sans-serif)",
+              fontSize: 11,
+              color: "#444",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+            }}
+          >
+            Scroll
+          </span>
+          <svg width="20" height="24" viewBox="0 0 20 24" fill="none">
+            <path
+              d="M10 2 L10 20 M4 14 L10 20 L16 14"
+              stroke="#444"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </div>
-
-        {/* Splat */}
-        {Array.from({ length: 16 }).map((_, i) => (
-          <div key={i} ref={(el) => { if (el) splatRef.current[i] = el; }}
-            className="absolute w-1 h-1 rounded-full bg-[#c96acb] opacity-0"
-            style={{ left: "50%", top: "50%" }} />
-        ))}
-
-        {/* Feature drops */}
-        <div ref={featStageRef} className="absolute flex gap-10 items-end opacity-0" style={{ bottom: "80px" }}>
-          {FEAT_LABELS.map((label, i) => (
-            <div key={label} className="flex flex-col items-center gap-2.5">
-              <div ref={(el) => { if (el) dropRefs.current[i] = el; }}
-                className="w-1.5 h-3 opacity-0 bg-[#c96acb]"
-                style={{ transform: "translateY(-80px)", borderRadius: "50% 50% 50% 50% / 35% 35% 65% 65%", boxShadow: "0 0 8px rgba(201,106,203,0.4)" }} />
-              <div ref={(el) => { if (el) labelRefs.current[i] = el; }}
-                className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white opacity-0"
-                style={{ fontFamily: "var(--font-syne)", transform: "translateY(10px)" }}>
-                {label}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Final headline */}
-        <div ref={headlineRef} className="absolute inset-0 flex flex-col items-center justify-center text-center opacity-0 pointer-events-none px-6">
-          <h1 className="font-extrabold leading-none text-white" style={{ fontFamily: "var(--font-syne)", letterSpacing: "-0.04em", fontSize: "clamp(44px, 7.5vw, 96px)" }}>
-            Never lose<br />what{" "}
-            <em className="not-italic" style={{ color: "#c96acb" }}>matters.</em>
-          </h1>
-          <p className="mt-5 text-[#a1a1aa] max-w-md leading-relaxed" style={{ fontSize: "17px" }}>
-            Record lectures, meetings, and conversations. Turn them into searchable knowledge with AI-powered summaries, tasks, flashcards, and memory recall.
-          </p>
-        </div>
-
-        {/* CTAs */}
-        <div ref={ctasRef} className="absolute flex gap-3.5 items-center opacity-0" style={{ top: "calc(50% + 200px)" }}>
-          <Button variant="primary" size="lg" href="/demo">Get started free</Button>
-          <Button variant="outline" size="lg" href="#how">See how it works</Button>
-        </div>
-
-        <style>{`@keyframes arrowBounce { 0%,100%{transform:rotate(45deg) translateY(0)} 50%{transform:rotate(45deg) translateY(4px)} }`}</style>
       </div>
     </div>
   );
 }
+
+export default HeroSection;
