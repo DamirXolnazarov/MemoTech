@@ -65,14 +65,14 @@ const CARDS = [
   },
 ];
 
-/* ─── Person silhouette (white, side-profile facing right) ───────────────── */
+/* ─── Speaking head SVG — exact paths from uploaded icon, white fill ─────── */
 function PersonSVG({ wrapRef }: { wrapRef: React.RefObject<HTMLDivElement> }) {
   return (
     <div
       ref={wrapRef}
       style={{
         position: "absolute",
-        left: "3vw",
+        left: "5vw",
         top: "50%",
         transform: "translateY(-52%)",
         zIndex: 6,
@@ -81,65 +81,36 @@ function PersonSVG({ wrapRef }: { wrapRef: React.RefObject<HTMLDivElement> }) {
       }}
     >
       <svg
-        width="300"
-        height="420"
-        viewBox="0 0 300 420"
+        width="280"
+        height="280"
+        viewBox="0 0 64 64"
         fill="white"
         xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMidYMid meet"
       >
-        {/* Traced from reference: 3/4 rear-facing person. Round head, bun, narrow neck, wide shoulders, bent arm. */}
-
-        {/* Main head — large round */}
-        <ellipse cx="168" cy="108" rx="82" ry="90" />
-
-        {/* Hair bun — small circle left of head */}
-        <circle cx="90" cy="130" r="24" />
-
-        {/* Chin / lower face taper */}
-        <path d="M118 185 C118 200 130 215 148 220 C164 224 178 216 182 202 C186 190 182 178 175 172 L160 168 C144 165 118 172 118 185Z" />
-
-        {/* Beard / jaw detail under chin */}
-        <path d="M128 210 C125 222 128 235 138 240 C148 244 160 240 165 230 C168 222 165 212 158 208Z" />
-
-        {/* Neck — narrow strip */}
-        <rect x="138" y="240" width="34" height="36" rx="6" />
-
-        {/* Collar piece */}
-        <rect x="126" y="270" width="58" height="22" rx="4" />
-
-        {/* Left shoulder + torso */}
-        <path d="M30 320 C20 310 15 295 20 280 C26 262 50 250 80 248 L130 245 C130 258 132 268 136 278 L136 420 L10 420Z" />
-
-        {/* Right shoulder */}
-        <path d="M196 278 C200 265 220 252 248 250 C270 248 288 256 294 268 C298 278 295 290 286 296 L240 308 C220 314 200 306 196 292Z" />
-
-        {/* Right arm — bent elbow */}
-        <path d="M268 296 C285 300 298 312 300 328 C302 342 295 355 283 360 C270 364 256 356 248 344 L240 320 C244 306 256 292 268 296Z" />
-
-        {/* Forearm resting */}
-        <path d="M225 358 C238 355 255 356 265 362 C278 370 282 384 274 392 C265 400 248 398 236 390 L218 374 C214 364 220 360 225 358Z" />
-
-        {/* Central torso fill */}
-        <rect x="136" y="278" width="60" height="142" />
-
+        {/* Body + face (the main speaking-head silhouette) */}
+        <path d="M38.478 42.632c-4.644-1.466-3.322-2.633 1.11-4.298c2.123-.799.832-2.484.89-3.832c.026-.617 2.452-.494 2.276-2.874c-.124-1.676-3.816-4.064-4.822-5.083c-.581-.588 1.184-2.197-.059-3.612c-1.697-1.934-1.965-5.299-2.992-7.181c0 0 .783-1.196.183-1.876c-5.176-5.859-24.491-5.321-29.427 3.302c-5.541 9.68-5.615 23.059 5.906 30.267C16.667 50.65 10.104 62 10.104 62h20.319c0-1.938-2.266-8.89 1.7-8.578c3.446.271 7.666.122 7.292-3.77c-.113-1.174-.246-2.231.574-3.204c.82-.972 2.007-2.706-1.511-3.816" />
+        {/* Sound wave arc 1 (closest to mouth) */}
+        <path d="M43.129 40.805L62 43.277v-4.943z" />
+        {/* Sound wave arc 2 */}
+        <path d="M58.46 57.081l2.024-4.281l-17.355-9.368z" />
+        {/* Sound wave arc 3 (furthest) */}
+        <path d="M60.484 28.766l-2.024-4.282l-15.331 13.651z" />
       </svg>
     </div>
   );
 }
 
-/* ─── Mouth sound waves — arcs radiating from person's mouth area ─────────── */
-function MouthWaves({ containerRef, waveRefs }: {
-  containerRef: React.RefObject<SVGGElement>;
+/* ─── Mouth arc waves (ORCHID arcs that animate from person toward mic) ──── */
+function MouthWaves({ waveRefs }: {
   waveRefs: React.MutableRefObject<SVGPathElement[]>;
 }) {
-  // Three arc waves, centered around mouth position (~310px from left, 50% height)
-  // Each arc opens rightward toward the mic
   const arcs = [
-    "M 0,-22 A 22,22 0 0,1 0,22",
-    "M 0,-40 A 40,40 0 0,1 0,40",
-    "M 0,-60 A 60,60 0 0,1 0,60",
-    "M 0,-82 A 82,82 0 0,1 0,82",
-    "M 0,-106 A 106,106 0 0,1 0,106",
+    "M 0,-18 A 18,18 0 0,1 0,18",
+    "M 0,-32 A 32,32 0 0,1 0,32",
+    "M 0,-50 A 50,50 0 0,1 0,50",
+    "M 0,-70 A 70,70 0 0,1 0,70",
+    "M 0,-94 A 94,94 0 0,1 0,94",
   ];
   return (
     <svg
@@ -147,8 +118,8 @@ function MouthWaves({ containerRef, waveRefs }: {
       viewBox="0 0 1440 900"
       preserveAspectRatio="xMidYMid slice"
     >
-      {/* mouth origin: x≈310 (person right edge + slight offset), y≈450 (vertical center) */}
-      <g ref={containerRef} transform="translate(310,450)">
+      {/* Origin at roughly where the person's mouth is: ~340px from left, vertically centered */}
+      <g transform="translate(340,450)">
         {arcs.map((d, i) => (
           <path
             key={i}
@@ -156,7 +127,7 @@ function MouthWaves({ containerRef, waveRefs }: {
             d={d}
             fill="none"
             stroke={ORCHID}
-            strokeWidth={2.4 - i * 0.3}
+            strokeWidth={2.6 - i * 0.35}
             strokeLinecap="round"
             opacity={0}
           />
@@ -181,27 +152,26 @@ function MicSVG({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }) {
   );
 }
 
-/* ─── Concentric circles radiating in ALL directions from mic center ─────── */
+/* ─── Radial circles from mic center ────────────────────────────────────── */
 function RadialCircles({ circleRefs }: {
   circleRefs: React.MutableRefObject<SVGCircleElement[]>;
 }) {
-  const radii = [55, 100, 155, 215, 285, 360];
   return (
     <svg
+      className="radial-circles-svg"
       viewBox="0 0 1440 900"
       preserveAspectRatio="xMidYMid slice"
       style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 3, overflow: "visible" }}
     >
-      {/* mic center ≈ 720, 440 in 1440×900 viewport space */}
       <g transform="translate(720,440)">
-        {radii.map((r, i) => (
+        {[55, 120, 195, 280, 375, 480].map((r, i) => (
           <circle
             key={i}
             ref={(el) => { if (el) circleRefs.current[i] = el; }}
             cx={0} cy={0} r={r}
             fill="none"
             stroke={ORCHID}
-            strokeWidth={1.8 - i * 0.2}
+            strokeWidth={1.8 - i * 0.18}
             opacity={0}
           />
         ))}
@@ -210,13 +180,13 @@ function RadialCircles({ circleRefs }: {
   );
 }
 
-/* ─── Demo cards fanned out ──────────────────────────────────────────────── */
+/* ─── Demo cards fanned around center ───────────────────────────────────── */
 const CARD_POSITIONS = [
-  { left: "18%", top: "18%" },
-  { left: "38%", top: "8%"  },
-  { left: "58%", top: "8%"  },
-  { left: "76%", top: "18%" },
-  { left: "78%", top: "62%" },
+  { left: "50%",  top: "15%",   transform: "translateX(-50%)" },  // top center
+  { left: "67%",  top: "42%",  transform: "translateX(0)" },      // right
+  { left: "50%",  top: "67%",  transform: "translateX(-50%)" },  // bottom center
+  { left: "20%",   top: "42%",  transform: "translateX(0)" },      // left
+  { left: "50%",  top: "41%",  transform: "translateX(-50%)" },  // center (inside circle)
 ];
 
 function DemoCards({ wrapRef, cardRefs }: {
@@ -231,16 +201,17 @@ function DemoCards({ wrapRef, cardRefs }: {
           ref={(el) => { if (el) cardRefs.current[i] = el; }}
           style={{
             position: "absolute",
-            left: CARD_POSITIONS[i].left,
-            top: CARD_POSITIONS[i].top,
-            width: 185,
+  left: CARD_POSITIONS[i].left,
+  top: CARD_POSITIONS[i].top,
+  transform: CARD_POSITIONS[i].transform,   // ← add this line
+  width: 185,
             background: "rgba(8,8,8,0.88)",
             border: "1px solid rgba(201,106,203,0.28)",
             borderRadius: 14,
             padding: "14px 16px",
             backdropFilter: "blur(14px)",
             opacity: 0,
-            boxShadow: "0 0 28px rgba(201,106,203,0.07)",
+            boxShadow: `0 0 40px rgba(201,106,203,0.12)`,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "var(--font-syne, Syne, sans-serif)", fontWeight: 700, fontSize: 12, color: ORCHID, letterSpacing: "0.06em", marginBottom: 8 }}>
@@ -256,21 +227,80 @@ function DemoCards({ wrapRef, cardRefs }: {
   );
 }
 
+/* ─── Scroll timeline dot indicator (active dot = centered section) ───────── */
+const PHASES = ["Intro", "Speaking", "Signal", "Insights", "Result"];
+
+function ScrollDots({ dotRefs, activeDotRefs }: {
+  dotRefs: React.MutableRefObject<HTMLDivElement[]>;
+  activeDotRefs: React.MutableRefObject<HTMLDivElement[]>;
+}) {
+  return (
+    <div style={{ position: "absolute", left: 28, top: "50%", transform: "translateY(-50%)", zIndex: 20, display: "flex", flexDirection: "column", gap: 20, pointerEvents: "none" }}>
+      {PHASES.map((label, i) => (
+        <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* Outer ring */}
+          <div
+            ref={(el) => { if (el) dotRefs.current[i] = el; }}
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              border: `1.5px solid rgba(201,106,203,0.35)`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+            }}
+          >
+            {/* Inner active dot */}
+            <div
+              ref={(el) => { if (el) activeDotRefs.current[i] = el; }}
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: ORCHID,
+                boxShadow: `0 0 8px ${ORCHID}`,
+                opacity: i === 0 ? 1 : 0,
+                transition: "opacity 0.3s ease",
+              }}
+            />
+          </div>
+          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "var(--font-inter, Inter, sans-serif)" }}>
+            {label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ─── Main export ────────────────────────────────────────────────────────── */
 export function HeroSection() {
   const wrapperRef      = useRef<HTMLDivElement>(null);
   const micWrapRef      = useRef<HTMLDivElement>(null);
   const micSvgRef       = useRef<SVGSVGElement>(null);
   const personWrapRef   = useRef<HTMLDivElement>(null);
-  const mouthWaveGroup  = useRef<SVGGElement>(null);
   const mouthWaveRefs   = useRef<SVGPathElement[]>([]);
   const circleRefs      = useRef<SVGCircleElement[]>([]);
   const cardsWrapRef    = useRef<HTMLDivElement>(null);
   const cardRefs        = useRef<HTMLDivElement[]>([]);
   const headlineRef     = useRef<HTMLDivElement>(null);
   const indicatorRef    = useRef<HTMLDivElement>(null);
+  const dotRefs         = useRef<HTMLDivElement[]>([]);
+  const activeDotRefs   = useRef<HTMLDivElement[]>([]);
 
   useEffect(() => {
+    // Phase boundaries (0–1 scroll progress → which dot lights up)
+    const phaseBoundaries = [0, 0.18, 0.38, 0.62, 0.82];
+
+    function setActiveDot(index: number) {
+      activeDotRefs.current.forEach((dot, i) => {
+        if (!dot) return;
+        dot.style.opacity = i === index ? "1" : "0";
+      });
+    }
+
     const gsapCtx = gsap.context(() => {
       const tl = gsap.timeline({
         scrollTrigger: {
@@ -278,33 +308,38 @@ export function HeroSection() {
           start: "top top",
           end: "bottom bottom",
           scrub: 1.4,
+          onUpdate(self) {
+            const p = self.progress;
+            let activePhase = 0;
+            for (let i = phaseBoundaries.length - 1; i >= 0; i--) {
+              if (p >= phaseBoundaries[i]) { activePhase = i; break; }
+            }
+            setActiveDot(activePhase);
+          },
         },
       });
 
-      /* ── Phase 1 (0 → 0.10): Person visible, mic visible, scroll hint fades ── */
-      tl.to(indicatorRef.current, { opacity: 0, duration: 0.06 }, 0.04);
+      /* ── Phase 1 (0 → 0.18): Mic + idle scroll indicator ── */
+      tl.to(indicatorRef.current, { opacity: 0, duration: 0.06 }, 0.12);
 
-      /* ── Phase 2 (0.10 → 0.38): Person slides in from left, mouth arc waves travel to mic ── */
-      // Person slides in from off-screen left
+      /* ── Phase 2 (0.18 → 0.38): Person slides in, mouth waves pulse ── */
       tl.fromTo(personWrapRef.current,
-        { opacity: 0, x: -80 },
+        { opacity: 0, x: -120 },
         { opacity: 1, x: 0, duration: 0.14, ease: "power3.out" },
-        0.10
+        0.18
       );
-
       mouthWaveRefs.current.forEach((w, i) => {
-        const start = 0.08 + i * 0.028;
+        const s = 0.22 + i * 0.026;
         tl.fromTo(w,
-          { opacity: 0, scale: 0.4, transformOrigin: "0px 0px" },
-          { opacity: 0.75 - i * 0.1, scale: 1, transformOrigin: "0px 0px", duration: 0.10, ease: "power2.out" },
-          start
+          { opacity: 0, scale: 0.3, transformOrigin: "0px 0px" },
+          { opacity: 0.8 - i * 0.12, scale: 1, transformOrigin: "0px 0px", duration: 0.10, ease: "power2.out" },
+          s
         );
-        tl.to(w, { opacity: 0, duration: 0.07, ease: "power2.in" }, start + 0.14);
+        tl.to(w, { opacity: 0, duration: 0.06, ease: "power2.in" }, s + 0.12);
       });
+      tl.to(personWrapRef.current, { opacity: 0, x: -80, duration: 0.08, ease: "power2.in" }, 0.36);
 
-      /* ── Phase 3 (0.36 → 0.55): Person fades, mic zooms, circles burst out ── */
-      tl.to(personWrapRef.current, { opacity: 0, x: -60, duration: 0.10, ease: "power2.in" }, 0.36);
-
+      /* ── Phase 3 (0.38 → 0.60): Mic zooms, radial circles burst ── */
       tl.to(micWrapRef.current, {
         scale: 2.8,
         duration: 0.16,
@@ -312,48 +347,46 @@ export function HeroSection() {
         transformOrigin: "50% 50%",
       }, 0.38);
 
-      // Circles burst outward in all directions, staggered
       circleRefs.current.forEach((c, i) => {
         tl.fromTo(c,
-          { attr: { r: 0 }, opacity: 0.7 - i * 0.08 },
-          { attr: { r: 55 + i * 72 }, opacity: 0.55 - i * 0.08, duration: 0.14, ease: "power2.out" },
-          0.40 + i * 0.022
+          { attr: { r: 0 }, opacity: 0 },
+          { attr: { r: 55 + i * 85 }, opacity: 0.55 - i * 0.07, duration: 0.14, ease: "power2.out" },
+          0.42 + i * 0.022
         );
       });
 
-      /* ── Phase 4 (0.58 → 0.78): Zoom into mic+circles, mic fades, circles fill screen ── */
+      /* ── Phase 4 (0.60 → 0.82): Zoom deep, mic vanishes, circles fill screen ── */
       tl.to(micWrapRef.current, {
-        scale: 7,
+        scale: 8,
         opacity: 0,
         duration: 0.16,
         ease: "power3.in",
         transformOrigin: "50% 50%",
-      }, 0.58);
+      }, 0.60);
 
-      // Circles keep expanding while zooming in — scale the whole SVG layer
       tl.to(".radial-circles-svg", {
-        scale: 3.2,
+        scale: 3.6,
         transformOrigin: "50% 49%",
-        duration: 0.18,
+        duration: 0.20,
         ease: "power3.in",
-      }, 0.58);
+      }, 0.60);
 
-      /* ── Phase 5 (0.72 → 0.88): Cards appear through the waves ── */
-      tl.to(cardsWrapRef.current, { opacity: 1, duration: 0.04 }, 0.72);
+      /* Cards emerge */
+      tl.to(cardsWrapRef.current, { opacity: 1, duration: 0.04 }, 0.68);
       cardRefs.current.forEach((card, i) => {
         tl.fromTo(card,
-          { opacity: 0, scale: 0.88, y: 16 },
+          { opacity: 0, scale: 0.86, y: 18 },
           { opacity: 1, scale: 1, y: 0, duration: 0.08, ease: "back.out(1.5)" },
-          0.74 + i * 0.030
+          0.70 + i * 0.030
         );
       });
 
-      /* ── Phase 6 (0.88 → 1.0): Cards + circles out, headline in ── */
-      tl.to([cardsWrapRef.current, ".radial-circles-svg"], { opacity: 0, duration: 0.07 }, 0.88);
+      /* ── Phase 5 (0.82 → 1.0): Cards out, headline in ── */
+      tl.to([cardsWrapRef.current, ".radial-circles-svg"], { opacity: 0, duration: 0.07 }, 0.83);
       tl.fromTo(headlineRef.current,
         { opacity: 0, y: 28 },
         { opacity: 1, y: 0, duration: 0.07, ease: "power2.out" },
-        0.93
+        0.90
       );
     }, wrapperRef);
 
@@ -368,20 +401,29 @@ export function HeroSection() {
           top: 0,
           height: "100vh",
           width: "100%",
-          background: "#050505",
           overflow: "hidden",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          /* Deep background with visible orchid hue glow */
+          background: `
+            radial-gradient(ellipse 70% 55% at 50% 48%, rgba(201,106,203,0.22) 0%, transparent 70%),
+            radial-gradient(ellipse 40% 40% at 20% 60%, rgba(201,106,203,0.12) 0%, transparent 60%),
+            radial-gradient(ellipse 35% 35% at 80% 35%, rgba(201,106,203,0.10) 0%, transparent 60%),
+            #050505
+          `,
         }}
       >
-        {/* Person — visible from frame 1, left side */}
+        {/* Side scroll dots */}
+        <ScrollDots dotRefs={dotRefs} activeDotRefs={activeDotRefs} />
+
+        {/* Person */}
         <PersonSVG wrapRef={personWrapRef} />
 
         {/* Mouth arc waves */}
-        <MouthWaves containerRef={mouthWaveGroup} waveRefs={mouthWaveRefs} />
+        <MouthWaves waveRefs={mouthWaveRefs} />
 
-        {/* Mic — centered */}
+        {/* Mic */}
         <div
           ref={micWrapRef}
           style={{
@@ -396,7 +438,7 @@ export function HeroSection() {
           <MicSVG svgRef={micSvgRef} />
         </div>
 
-        {/* Radial circles — all directions */}
+        {/* Radial circles */}
         <RadialCircles circleRefs={circleRefs} />
 
         {/* Demo cards */}
@@ -430,9 +472,7 @@ export function HeroSection() {
               color: "white",
             }}
           >
-            Never lose
-            <br />
-            what <span style={{ color: ORCHID }}>matters.</span>
+            Never lose<br />what <span style={{ color: ORCHID }}>matters.</span>
           </h1>
           <p
             style={{
@@ -447,40 +487,16 @@ export function HeroSection() {
             the moment you need it.
           </p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", pointerEvents: "all" }}>
-            <button
-              style={{
-                background: ORCHID,
-                color: "white",
-                border: "none",
-                borderRadius: 9,
-                padding: "13px 28px",
-                fontFamily: "var(--font-inter, Inter, sans-serif)",
-                fontWeight: 600,
-                fontSize: "0.95rem",
-                cursor: "pointer",
-              }}
-            >
+            <button style={{ background: ORCHID, color: "white", border: "none", borderRadius: 9, padding: "13px 28px", fontFamily: "var(--font-inter, Inter, sans-serif)", fontWeight: 600, fontSize: "0.95rem", cursor: "pointer" }}>
               Get started free
             </button>
-            <button
-              style={{
-                background: "transparent",
-                color: "white",
-                border: "1.5px solid rgba(255,255,255,0.2)",
-                borderRadius: 9,
-                padding: "12px 28px",
-                fontFamily: "var(--font-inter, Inter, sans-serif)",
-                fontWeight: 500,
-                fontSize: "0.95rem",
-                cursor: "pointer",
-              }}
-            >
+            <button style={{ background: "transparent", color: "white", border: "1.5px solid rgba(255,255,255,0.2)", borderRadius: 9, padding: "12px 28px", fontFamily: "var(--font-inter, Inter, sans-serif)", fontWeight: 500, fontSize: "0.95rem", cursor: "pointer" }}>
               See how it works
             </button>
           </div>
         </div>
 
-        {/* Scroll indicator */}
+        {/* Scroll indicator arrow */}
         <div
           ref={indicatorRef}
           style={{
@@ -496,25 +512,11 @@ export function HeroSection() {
             pointerEvents: "none",
           }}
         >
-          <span
-            style={{
-              fontFamily: "var(--font-inter, Inter, sans-serif)",
-              fontSize: 11,
-              color: "#444",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-            }}
-          >
+          <span style={{ fontFamily: "var(--font-inter, Inter, sans-serif)", fontSize: 11, color: "#555", letterSpacing: "0.12em", textTransform: "uppercase" }}>
             Scroll
           </span>
           <svg width="20" height="24" viewBox="0 0 20 24" fill="none">
-            <path
-              d="M10 2 L10 20 M4 14 L10 20 L16 14"
-              stroke="#444"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <path d="M10 2 L10 20 M4 14 L10 20 L16 14" stroke="#555" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
       </div>

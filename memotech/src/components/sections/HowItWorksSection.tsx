@@ -1,5 +1,8 @@
+"use client";
+
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { RevealOnScroll } from "@/components/ui/RevealOnScroll";
+import { useEffect, useRef } from "react";
 
 function WaveformVisual() {
   const heights = [18, 34, 28, 44, 22, 38, 16, 32, 40, 24, 36, 20];
@@ -80,6 +83,39 @@ const STEPS = [
 ];
 
 export function HowItWorksSection() {
+  const dotRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    const update = () => {
+      const mid = window.innerHeight / 2;
+      let closest = 0;
+      let closestDist = Infinity;
+      rowRefs.current.forEach((row, i) => {
+        if (!row) return;
+        const rect = row.getBoundingClientRect();
+        const center = rect.top + rect.height / 2;
+        const dist = Math.abs(center - mid);
+        if (dist < closestDist) { closestDist = dist; closest = i; }
+      });
+      dotRefs.current.forEach((dot, i) => {
+        if (!dot) return;
+        if (i === closest) {
+          dot.style.background = "#c96acb";
+          dot.style.borderColor = "#c96acb";
+          dot.style.boxShadow = "0 0 14px rgba(201,106,203,0.5)";
+        } else {
+          dot.style.background = "#050505";
+          dot.style.borderColor = "#2a2a2a";
+          dot.style.boxShadow = "none";
+        }
+      });
+    };
+    window.addEventListener("scroll", update, { passive: true });
+    update();
+    return () => window.removeEventListener("scroll", update);
+  }, []);
+
   return (
     <section id="how" className="max-w-6xl mx-auto px-12 py-28 border-t border-[#1a1a1a]">
       <RevealOnScroll>
@@ -92,9 +128,16 @@ export function HowItWorksSection() {
       <div className="mt-20 ml-6 pl-12 border-l border-[#1a1a1a] divide-y divide-[#1a1a1a]">
         {STEPS.map((s, i) => (
           <RevealOnScroll key={s.step} delay={i * 60} className="py-16">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center relative">
-              <div className={`absolute -left-[61px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full border ${i === 0 ? "bg-[#c96acb] border-[#c96acb]" : "bg-[#050505] border-[#2a2a2a]"}`}
-                style={i === 0 ? { boxShadow: "0 0 14px rgba(201,106,203,0.4)" } : {}} />
+            <div
+              ref={(el) => { rowRefs.current[i] = el; }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center relative"
+            >
+              {/* Scroll-driven dot — no hardcoded i===0 */}
+              <div
+                ref={(el) => { dotRefs.current[i] = el; }}
+                className="absolute -left-[61px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full border bg-[#050505] border-[#2a2a2a]"
+                style={{ transition: "background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease" }}
+              />
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c96acb] mb-3.5" style={{ fontFamily: "var(--font-syne)" }}>Step {s.step}</div>
                 <h3 className="text-2xl font-bold text-white mb-3.5" style={{ fontFamily: "var(--font-syne)", letterSpacing: "-0.02em" }}>{s.title}</h3>
