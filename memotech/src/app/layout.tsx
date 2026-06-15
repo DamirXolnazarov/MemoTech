@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { AmbientBackground } from "@/components/ui/AmbientBackground";
 import "./globals.css";
 
@@ -20,10 +21,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="antialiased">
-        <AmbientBackground />
-        <div style={{ position: "relative", zIndex: 1 }}>
-          {children}
-        </div>
+        <ClerkProvider>
+          <AmbientBackground />
+          <div style={{ position: "relative", zIndex: 1 }}>
+            {children}
+          </div>
+        </ClerkProvider>
       </body>
     </html>
   );

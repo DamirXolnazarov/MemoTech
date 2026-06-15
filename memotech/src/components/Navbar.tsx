@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { SignInButton, SignUpButton, UserButton, Show } from "@clerk/nextjs";
 import { NAV_LINKS } from "@/lib/constants";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -56,12 +57,22 @@ export function Navbar() {
 
         {/* Right */}
         <div className="hidden md:flex items-center gap-4">
-          <Button variant="ghost" size="sm">
-            Sign in
-          </Button>
-          <Button variant="primary" size="sm" href="/demo">
-            Try demo →
-          </Button>
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <Button variant="ghost" size="sm">
+                Sign in
+              </Button>
+            </SignInButton>
+            <Button variant="primary" size="sm" href="/demo">
+              Try demo →
+            </Button>
+          </Show>
+          <Show when="signed-in">
+            <Button variant="primary" size="sm" href="/app">
+              Dashboard →
+            </Button>
+            <UserButton />
+          </Show>
         </div>
 
         {/* Mobile menu toggle */}
@@ -93,12 +104,24 @@ export function Navbar() {
           </Link>
         ))}
         <div className="flex flex-col gap-3 mt-4 w-full px-8">
-          <Button variant="outline" size="lg" className="w-full justify-center">
-            Sign in
-          </Button>
-          <Button variant="primary" size="lg" href="/demo" className="w-full justify-center">
-            Try demo →
-          </Button>
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <Button variant="outline" size="lg" className="w-full justify-center">
+                Sign in
+              </Button>
+            </SignInButton>
+            <Button variant="primary" size="lg" href="/demo" className="w-full justify-center">
+              Try demo →
+            </Button>
+          </Show>
+          <Show when="signed-in">
+            <Button variant="primary" size="lg" href="/app" className="w-full justify-center">
+              Dashboard →
+            </Button>
+            <div className="flex justify-center">
+              <UserButton />
+            </div>
+          </Show>
         </div>
       </div>
     </>
