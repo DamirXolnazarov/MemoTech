@@ -472,8 +472,21 @@ ${transcript.slice(0, 6000)}`,
       buildPitch(pres, parsed.slides);
     }
 
-    const pptxBuffer: ArrayBuffer = await pres.write({ outputType: "arraybuffer" });
-    const pptxBase64 = Buffer.from(pptxBuffer).toString("base64");
+    const pptxResult = await pres.write({ outputType: "arraybuffer" });
+    let pptxBase64: string;
+
+    if (typeof pptxResult === "string") {
+      pptxBase64 = pptxResult;
+    } else if (pptxResult instanceof Blob) {
+      const buffer = await pptxResult.arrayBuffer();
+      pptxBase64 = Buffer.from(new Uint8Array(buffer)).toString("base64");
+    } else if (pptxResult instanceof Uint8Array) {
+      pptxBase64 = Buffer.from(pptxResult).toString("base64");
+    } else if (pptxResult instanceof ArrayBuffer) {
+      pptxBase64 = Buffer.from(new Uint8Array(pptxResult)).toString("base64");
+    } else {
+      throw new Error("Unexpected PPTX write result type");
+    }
 
     // ── Step 3: Return ─────────────────────────────────────────────────────────
     return NextResponse.json({
