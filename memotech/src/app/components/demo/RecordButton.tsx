@@ -3,11 +3,26 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
 // Browser Speech Recognition types (not in TS lib by default)
+interface SpeechRecognitionResultItem {
+  transcript: string;
+}
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  [index: number]: SpeechRecognitionResultItem;
+}
+interface SpeechRecognitionResultList {
+  length: number;
+  [index: number]: SpeechRecognitionResult;
+}
+interface ISpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
 interface ISpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
-  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onresult: ((e: ISpeechRecognitionEvent) => void) | null;
   onerror: ((e: Event) => void) | null;
   onend: (() => void) | null;
   start(): void;
@@ -52,7 +67,6 @@ export default function RecordButton({
   const streamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const transcriptRef = useRef("");
-  // keep stopRecording stable via ref so interval can call it
   const stopRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -93,7 +107,6 @@ export default function RecordButton({
     onRecordingComplete(finalTranscript.trim(), duration);
   }, [onRecordingComplete]);
 
-  // keep ref fresh so interval always sees latest version
   useEffect(() => {
     stopRef.current = stopRecording;
   }, [stopRecording]);
@@ -124,7 +137,7 @@ export default function RecordButton({
         recognitionRef.current = recognition;
 
         let finalTranscript = "";
-        recognition.onresult = (e: SpeechRecognitionEvent) => {
+        recognition.onresult = (e: ISpeechRecognitionEvent) => {
           let interim = "";
           for (let i = e.resultIndex; i < e.results.length; i++) {
             if (e.results[i].isFinal) {
@@ -136,7 +149,6 @@ export default function RecordButton({
           transcriptRef.current = finalTranscript + interim;
           setLiveTranscript(transcriptRef.current);
         };
-        // auto-restart on end so it doesn't silently stop
         recognition.onend = () => {
           if (recognitionRef.current) {
             try { recognition.start(); } catch { /* already stopped */ }
