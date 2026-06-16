@@ -9,6 +9,7 @@ import { VisionSection } from "@/components/sections/VisionSection";
 import { FAQSection } from "@/components/sections/FAQSection";
 import { CTASection } from "@/components/sections/CTASection";
 import { Footer } from "@/components/Footer";
+import { PricingSection } from "@/components/sections/PricingSection";
 
 export default function HomePage() {
   return (
@@ -19,6 +20,7 @@ export default function HomePage() {
       <ProblemSection />
       <FeaturesSection />
       <HowItWorksSection />
+      <PricingSection />
       <SearchSection />
       <VisionSection />
       <FAQSection />

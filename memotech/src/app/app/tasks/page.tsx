@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import TopBar from "@/components/app/TopBar";
-import { Calendar } from "lucide-react";
 
 // TODO: Replace with real DB fetch — aggregate tasks from all sessions by userId
 const ALL_TASKS = [
@@ -26,6 +25,23 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
 
 const FILTERS = ["All", "Today", "This Week", "Overdue"];
 
+function buildGoogleCalendarUrl(task: string, dueDate?: string): string {
+  const base = "https://calendar.google.com/calendar/render?action=TEMPLATE";
+  const title = encodeURIComponent(task);
+  let dates = "";
+  if (dueDate) {
+    try {
+      const d = new Date(dueDate);
+      if (!isNaN(d.getTime())) {
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const dateStr = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+        dates = `&dates=${dateStr}/${dateStr}`;
+      }
+    } catch { /* skip */ }
+  }
+  return `${base}&text=${title}${dates}&details=${encodeURIComponent("Added from Memo")}`;
+}
+
 export default function TasksPage() {
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState("All");
@@ -37,8 +53,6 @@ export default function TasksPage() {
       return next;
     });
   };
-
-  const tasks = ALL_TASKS;
 
   return (
     <div>
@@ -66,18 +80,14 @@ export default function TasksPage() {
 
         {/* Task list */}
         <div className="flex flex-col gap-2">
-          {tasks.map((task) => {
+          {ALL_TASKS.map((task) => {
             const isDone = checked.has(task.id);
             const colors = priorityColors[task.priority];
             return (
               <div
                 key={task.id}
                 className="flex items-center gap-4 rounded-xl border px-5 py-4 transition-all"
-                style={{
-                  background: "#0b0b0b",
-                  borderColor: "#1a1a1a",
-                  opacity: isDone ? 0.45 : 1,
-                }}
+                style={{ background: "#0b0b0b", borderColor: "#1a1a1a", opacity: isDone ? 0.45 : 1 }}
               >
                 {/* Checkbox */}
                 <button
@@ -126,14 +136,32 @@ export default function TasksPage() {
                   {task.dueDate}
                 </span>
 
-                {/* Calendar button */}
-                <button
-                  className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 transition-colors hover:border-[#c96acb]/50 hover:text-[#c96acb]"
-                  style={{ border: "1px solid #1f1f1f", color: "#444", background: "transparent", cursor: "pointer", flexShrink: 0 }}
+                {/* Google Calendar link */}
+                <a
+                  href={buildGoogleCalendarUrl(task.text, task.dueDate)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 transition-all"
+                  style={{
+                    border: "1px solid #1f1f1f", color: "#555",
+                    background: "transparent", flexShrink: 0,
+                    fontFamily: "var(--font-inter)", fontSize: 11,
+                    textDecoration: "none", whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "#4285f4";
+                    e.currentTarget.style.color = "#4285f4";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "#1f1f1f";
+                    e.currentTarget.style.color = "#555";
+                  }}
                 >
-                  <Calendar size={12} />
-                  <span style={{ fontFamily: "var(--font-inter)", fontSize: 11, whiteSpace: "nowrap" }}>Add</span>
-                </button>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 4h-1V2h-2v2H8V2H6v2H5C3.89 4 3 4.9 3 6v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                  </svg>
+                  Add to Calendar
+                </a>
               </div>
             );
           })}
