@@ -53,7 +53,12 @@ const WHITE = "ffffff";
 const BODY_GRAY = "a1a1aa";
 const ZINC = "52525b";
 
-// ─── Slide builders ──────────────────────────────────────────────────────────
+// pptxgenjs exposes shape constants as a static-like object on the imported
+// module itself (not on slide/presentation instances). Using `as any` here
+// keeps this resilient across pptxgenjs versions where the exact type
+// export changes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ShapeType: any = (pptxgen as any).ShapeType;
 
 function buildMinimal(pres: InstanceType<typeof pptxgen>, slides: Slide[]) {
   for (const slide of slides) {
@@ -82,7 +87,7 @@ function buildMinimal(pres: InstanceType<typeof pptxgen>, slides: Slide[]) {
         x: 0.6, y: 0.4, w: 8.8, h: 0.7,
         fontSize: 28, bold: true, color: WHITE, fontFace: "Calibri",
       });
-      s.addShape(pres.shapes.RECTANGLE, {
+      s.addShape(ShapeType.rect, {
         x: 0.6, y: 1.2, w: 8.8, h: 0.02,
         fill: { color: ORCHID, transparency: 40 },
         line: { color: ORCHID, width: 0 },
@@ -102,7 +107,7 @@ function buildMinimal(pres: InstanceType<typeof pptxgen>, slides: Slide[]) {
         x: 0.6, y: 0.4, w: 8.8, h: 0.7,
         fontSize: 24, bold: true, color: WHITE, fontFace: "Calibri",
       });
-      s.addShape(pres.shapes.RECTANGLE, {
+      s.addShape(ShapeType.rect, {
         x: 0.6, y: 1.2, w: 8.8, h: 0.02,
         fill: { color: ORCHID, transparency: 40 },
         line: { color: ORCHID, width: 0 },
@@ -134,7 +139,7 @@ function buildMinimal(pres: InstanceType<typeof pptxgen>, slides: Slide[]) {
         x: 0.6, y: 0.4, w: 8.8, h: 0.7,
         fontSize: 28, bold: true, color: WHITE, fontFace: "Calibri",
       });
-      s.addShape(pres.shapes.RECTANGLE, {
+      s.addShape(ShapeType.rect, {
         x: 0.6, y: 1.2, w: 8.8, h: 0.02,
         fill: { color: ORCHID, transparency: 40 },
         line: { color: ORCHID, width: 0 },
@@ -168,7 +173,7 @@ function buildAcademic(pres: InstanceType<typeof pptxgen>, slides: Slide[]) {
     const isTitle = slide.type === "title";
     if (!isTitle) {
       // Header bar
-      s.addShape(pres.shapes.RECTANGLE, {
+      s.addShape(ShapeType.rect, {
         x: 0, y: 0, w: 10, h: 0.85,
         fill: { color: GRAY_HEADER },
         line: { color: GRAY_HEADER, width: 0 },
@@ -226,7 +231,7 @@ function buildAcademic(pres: InstanceType<typeof pptxgen>, slides: Slide[]) {
         fontFace: "Calibri", valign: "top",
       });
       if (cs.highlight) {
-        s.addShape(pres.shapes.ROUNDED_RECTANGLE, {
+        s.addShape(ShapeType.roundRect, {
           x: 0.6, y: 4.4, w: 8.8, h: 0.85,
           fill: { color: "1a1a1a" },
           line: { color: ORCHID, width: 1 },
@@ -267,7 +272,7 @@ function buildPitch(pres: InstanceType<typeof pptxgen>, slides: Slide[]) {
     s.background = { color: BLACK };
 
     // Bottom bar for all slides
-    s.addShape(pres.shapes.RECTANGLE, {
+    s.addShape(ShapeType.rect, {
       x: 0, y: 5.3, w: 10, h: 0.325,
       fill: { color: ORCHID },
       line: { color: ORCHID, width: 0 },
