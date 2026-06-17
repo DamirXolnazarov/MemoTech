@@ -2,11 +2,26 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
+interface SpeechRecognitionResultItem {
+  transcript: string;
+}
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  [index: number]: SpeechRecognitionResultItem;
+}
+interface SpeechRecognitionResultList {
+  length: number;
+  [index: number]: SpeechRecognitionResult;
+}
+interface ISpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
 interface ISpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
-  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onresult: ((e: ISpeechRecognitionEvent) => void) | null;
   onerror: ((e: Event) => void) | null;
   onend: (() => void) | null;
   start(): void;
@@ -50,7 +65,7 @@ export default function RecordButton({
   const streamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const transcriptRef = useRef("");
-  const isStoppingRef = useRef(false); // prevent onend from restarting during stop
+  const isStoppingRef = useRef(false);
   const stopRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -71,7 +86,6 @@ export default function RecordButton({
   }, []);
 
   const cleanupAll = useCallback(() => {
-    // Mark as stopping so onend doesn't restart
     isStoppingRef.current = true;
 
     if (timerRef.current) {
@@ -122,7 +136,6 @@ export default function RecordButton({
     stopRef.current = stopRecording;
   }, [stopRecording]);
 
-  // Full cleanup on unmount
   useEffect(() => {
     return () => {
       isStoppingRef.current = true;
@@ -139,7 +152,6 @@ export default function RecordButton({
   }, []);
 
   const startRecording = useCallback(async () => {
-    // Full reset before starting
     transcriptRef.current = "";
     setError(null);
     setLiveTranscript("");
@@ -167,7 +179,7 @@ export default function RecordButton({
 
         let finalTranscript = "";
 
-        recognition.onresult = (e: SpeechRecognitionEvent) => {
+        recognition.onresult = (e: ISpeechRecognitionEvent) => {
           let interim = "";
           for (let i = e.resultIndex; i < e.results.length; i++) {
             if (e.results[i].isFinal) {
@@ -181,13 +193,11 @@ export default function RecordButton({
         };
 
         recognition.onerror = (e: Event) => {
-          const err = e as ErrorEvent;
-          // Ignore aborted errors — those happen when we intentionally stop
-          if ((err as unknown as { error: string }).error === "aborted") return;
+          const err = e as unknown as { error: string };
+          if (err.error === "aborted") return;
           console.warn("Speech recognition error:", err);
         };
 
-        // Auto-restart only if we're not intentionally stopping
         recognition.onend = () => {
           if (isStoppingRef.current) return;
           if (recognitionRef.current) {
@@ -262,7 +272,6 @@ export default function RecordButton({
 
   return (
     <div className="flex flex-col items-center gap-8">
-      {/* Waveform */}
       <div
         className="flex items-end gap-1 transition-opacity duration-300"
         style={{ height: 64, opacity: recState === "recording" ? 1 : 0 }}
@@ -279,7 +288,6 @@ export default function RecordButton({
         ))}
       </div>
 
-      {/* Button */}
       <div className="relative flex items-center justify-center">
         {recState === "recording" && (
           <>
@@ -317,26 +325,22 @@ export default function RecordButton({
         </button>
       </div>
 
-      {/* Timer */}
       {recState === "recording" && (
         <div style={{ fontFamily: "var(--font-syne)", fontSize: 28, fontWeight: 600, color: "#c96acb", letterSpacing: "0.05em" }}>
           {formatTime(timer)}
         </div>
       )}
 
-      {/* Label */}
       <p style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "#555", letterSpacing: "0.03em" }}>
         {recState === "idle" ? "Click to start recording" : "Click to stop"}
       </p>
 
-      {/* Live transcript preview */}
       {recState === "recording" && liveTranscript && (
         <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#444", maxWidth: 320, textAlign: "center", lineHeight: 1.6 }}>
           {liveTranscript.slice(-120)}{liveTranscript.length > 120 ? "…" : ""}
         </p>
       )}
 
-      {/* Time warning */}
       {recState === "recording" && remaining <= 60 && (
         <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#f87171" }}>
           {remaining}s remaining — recording will stop automatically
