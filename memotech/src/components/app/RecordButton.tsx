@@ -40,6 +40,11 @@ function getSR(): ISpeechRecognitionConstructor | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 interface RecordButtonProps {
   onRecordingComplete: (transcript: string, duration: number) => void;
   maxDurationSeconds?: number;
@@ -69,7 +74,10 @@ export default function RecordButton({
   const stopRef = useRef<() => void>(() => {});
 
   useEffect(() => {
-    if (!getSR()) setNoSpeechSupport(true);
+    // On mobile, Web Speech API support is unreliable across browsers/OSes
+    // (no support on iOS Safari, inconsistent on Android Chrome). Default
+    // straight to the paste-transcript fallback there.
+    if (!getSR() || isMobileDevice()) setNoSpeechSupport(true);
   }, []);
 
   const animateWaveform = useCallback(() => {
@@ -126,7 +134,7 @@ export default function RecordButton({
     cleanupAll();
 
     if (!finalTranscript.trim()) {
-      setError("No speech detected. Please try again.");
+      setError("No speech detected. Please try again, or use the text box below.");
       return;
     }
     onRecordingComplete(finalTranscript.trim(), duration);
@@ -195,7 +203,15 @@ export default function RecordButton({
         recognition.onerror = (e: Event) => {
           const err = e as unknown as { error: string };
           if (err.error === "aborted") return;
-          console.warn("Speech recognition error:", err);
+          if (err.error === "not-allowed" || err.error === "service-not-allowed") {
+            setError("Speech recognition permission was blocked by the browser. Try the text box below instead.");
+          } else if (err.error === "network") {
+            setError("Speech recognition needs an internet connection. Check your connection and try again.");
+          } else if (err.error === "no-speech") {
+            // handled by stopRecording's empty-transcript check; ignore here
+          } else {
+            console.warn("Speech recognition error:", err);
+          }
         };
 
         recognition.onend = () => {
@@ -220,8 +236,19 @@ export default function RecordButton({
       }, 500);
 
       animFrameRef.current = requestAnimationFrame(animateWaveform);
-    } catch {
-      setError("Microphone access denied. Please allow microphone access and try again.");
+    } catch (err: unknown) {
+      const domErr = err as DOMException;
+      if (domErr?.name === "NotAllowedError") {
+        setError(
+          "Microphone access is blocked. Click the lock icon in your browser's address bar, set Microphone to \"Allow\", then reload the page completely."
+        );
+      } else if (domErr?.name === "NotFoundError") {
+        setError("No microphone was found on this device.");
+      } else if (domErr?.name === "NotReadableError") {
+        setError("Your microphone is being used by another app or browser tab. Close it and try again.");
+      } else {
+        setError("Couldn't access the microphone. Please check your browser permissions and try again.");
+      }
       cleanupAll();
     }
   }, [animateWaveform, maxDurationSeconds, cleanupAll]);
@@ -243,7 +270,9 @@ export default function RecordButton({
     return (
       <div className="flex flex-col items-center gap-6 w-full max-w-md">
         <p style={{ color: "#c96acb", fontFamily: "var(--font-syne)" }} className="text-sm text-center">
-          Your browser doesn&apos;t support live transcription. Please use Chrome, or paste your transcript below.
+          {isMobileDevice()
+            ? "Live transcription works best on desktop Chrome. Paste your transcript below instead."
+            : "Your browser doesn't support live transcription. Please use Chrome, or paste your transcript below."}
         </p>
         <textarea
           value={fallbackText}
@@ -348,7 +377,7 @@ export default function RecordButton({
       )}
 
       {error && (
-        <p style={{ color: "#f87171", fontFamily: "var(--font-inter)", fontSize: 13, textAlign: "center", maxWidth: 300 }}>
+        <p style={{ color: "#f87171", fontFamily: "var(--font-inter)", fontSize: 13, textAlign: "center", maxWidth: 360, lineHeight: 1.6 }}>
           {error}
         </p>
       )}
