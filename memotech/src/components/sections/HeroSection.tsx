@@ -66,7 +66,7 @@ const CARDS = [
 ];
 
 /* ─── Speaking head SVG — exact paths from uploaded icon, white fill ─────── */
-function PersonSVG({ wrapRef }: { wrapRef: React.RefObject<HTMLDivElement> }) {
+function PersonSVG({ wrapRef }: { wrapRef: React.RefObject<HTMLDivElement | null> }) {
   return (
     <div
       ref={wrapRef}
@@ -138,7 +138,7 @@ function MouthWaves({ waveRefs }: {
 }
 
 /* ─── Mic SVG ────────────────────────────────────────────────────────────── */
-function MicSVG({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }) {
+function MicSVG({ svgRef }: { svgRef: React.RefObject<SVGSVGElement | null> }) {
   return (
     <svg ref={svgRef} width="100" height="128" viewBox="0 0 100 128" fill="none" style={{ overflow: "visible" }}>
       <rect x="30" y="4" width="40" height="60" rx="20" fill="white" />
@@ -190,7 +190,7 @@ const CARD_POSITIONS = [
 ];
 
 function DemoCards({ wrapRef, cardRefs }: {
-  wrapRef: React.RefObject<HTMLDivElement>;
+  wrapRef: React.RefObject<HTMLDivElement | null>;
   cardRefs: React.MutableRefObject<HTMLDivElement[]>;
 }) {
   return (

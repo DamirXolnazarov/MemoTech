@@ -53,7 +53,7 @@ export function ProblemSection() {
               style={{ boxShadow: "inset 0 0 0 0px transparent", transition: "background 0.3s ease, box-shadow 0.3s ease" }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.boxShadow = "inset 0 0 0 1px rgba(201,106,203,0.5), 0 0 20px rgba(201,106,203,0.35), 0 0 40px rgba(201,106,203,0.2)";
-                const numberElement = e.currentTarget.querySelector("div:first-child");
+                const numberElement = e.currentTarget.querySelector("div:first-child") as HTMLElement | null;
                 if (numberElement) {
                   numberElement.style.color = "#c96acb";
                   numberElement.style.textShadow = `
@@ -67,7 +67,7 @@ export function ProblemSection() {
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.boxShadow = "inset 0 0 0 0px transparent";
-                const numberElement = e.currentTarget.querySelector("div:first-child");
+                const numberElement = e.currentTarget.querySelector("div:first-child") as HTMLElement | null;
                 if (numberElement) {
                   numberElement.style.color = "#1a1a1a";
                   numberElement.style.textShadow = "none";
