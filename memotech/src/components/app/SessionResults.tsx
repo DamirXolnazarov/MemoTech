@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useUser } from "@clerk/nextjs";
 import SummaryTab from "./tabs/SummaryTab";
 import TranscriptTab from "./tabs/TranscriptTab";
 import TasksTab from "./tabs/TasksTab";
@@ -27,6 +26,8 @@ interface SessionResultsProps {
   duration: number;
   onReset: () => void;
 }
+
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -58,8 +59,8 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 export default function SessionResults({ data, transcript, duration, onReset }: SessionResultsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("summary");
   const [tabVisible, setTabVisible] = useState(true);
-  const [saved, setSaved] = useState(false);
-  const { user } = useUser();
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [errorMsg, setErrorMsg] = useState("");
 
   const switchTab = (tab: Tab) => {
     if (tab === activeTab) return;
@@ -67,14 +68,49 @@ export default function SessionResults({ data, transcript, duration, onReset }: 
     setTimeout(() => { setActiveTab(tab); setTabVisible(true); }, 150);
   };
 
-  // TODO: Replace with real DB save — POST to /api/sessions with userId + data
   const handleSave = async () => {
-    console.log("Saving session for user:", user?.id, data.title);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    if (saveState === "saving") return;
+    setSaveState("saving");
+    setErrorMsg("");
+
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: data.title,
+          shortSummary: data.shortSummary,
+          detailedSummary: data.detailedSummary,
+          keyConcepts: data.keyConcepts,
+          transcript,
+          duration,
+          tasks: data.tasks,
+          flashcards: data.flashcards,
+          keyMoments: data.keyMoments,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || "Failed to save session");
+      }
+
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 2500);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Something went wrong");
+      setSaveState("error");
+      setTimeout(() => setSaveState("idle"), 3000);
+    }
   };
 
   const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+  const saveLabel =
+    saveState === "saving" ? "Saving..." :
+    saveState === "saved" ? "✓ Saved!" :
+    saveState === "error" ? "✗ Failed — retry" :
+    "Save Session";
 
   return (
     <div className="flex" style={{ minHeight: "calc(100vh - 56px)" }}>
@@ -134,17 +170,30 @@ export default function SessionResults({ data, transcript, duration, onReset }: 
         <div style={{ padding: "12px 12px 20px", borderTop: "1px solid #111", display: "flex", flexDirection: "column", gap: 8 }}>
           <button
             onClick={handleSave}
+            disabled={saveState === "saving"}
             style={{
               fontFamily: "var(--font-inter)", fontSize: 12,
-              color: saved ? "#c96acb" : "#fff",
-              background: saved ? "rgba(201,106,203,0.1)" : "#c96acb",
-              border: saved ? "1px solid rgba(201,106,203,0.3)" : "none",
-              borderRadius: 8, padding: "7px 10px", cursor: "pointer",
+              color: saveState === "saved" ? "#c96acb" : saveState === "error" ? "#f87171" : "#fff",
+              background:
+                saveState === "saved" ? "rgba(201,106,203,0.1)" :
+                saveState === "error" ? "rgba(239,68,68,0.1)" :
+                saveState === "saving" ? "#8a4d8c" : "#c96acb",
+              border:
+                saveState === "saved" ? "1px solid rgba(201,106,203,0.3)" :
+                saveState === "error" ? "1px solid rgba(239,68,68,0.3)" : "none",
+              borderRadius: 8, padding: "7px 10px",
+              cursor: saveState === "saving" ? "default" : "pointer",
               transition: "all 0.2s ease", fontWeight: 500,
             }}
           >
-            {saved ? "✓ Saved!" : "Save Session"}
+            {saveLabel}
           </button>
+
+          {saveState === "error" && errorMsg && (
+            <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, color: "#f87171", lineHeight: 1.4 }}>
+              {errorMsg}
+            </p>
+          )}
 
           <button
             onClick={onReset}
