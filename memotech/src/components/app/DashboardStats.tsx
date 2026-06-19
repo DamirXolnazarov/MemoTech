@@ -1,36 +1,29 @@
+"use client";
+
 import { Brain, CheckSquare, Flame, Clock } from "lucide-react";
 
-// TODO: Replace hardcoded values with real DB queries when database is connected
-const stats = [
-  {
-    label: "Total Memories",
-    value: "0",
-    icon: Brain,
-    color: "#c96acb",
-  },
-  {
-    label: "Tasks Due Today",
-    value: "0",
-    icon: CheckSquare,
-    color: "#f59e0b",
-  },
-  {
-    label: "Study Streak",
-    value: "0",
-    icon: Flame,
-    color: "#f97316",
-    suffix: "days",
-  },
-  {
-    label: "Hours Recorded",
-    value: "0",
-    icon: Clock,
-    color: "#3b82f6",
-    suffix: "hrs",
-  },
-];
+interface DashboardStatsProps {
+  totalMemories: number;
+  tasksDueToday: number;
+  studyStreak: number;
+  hoursRecorded: number;
+  loading: boolean;
+}
 
-export default function DashboardStats() {
+export default function DashboardStats({
+  totalMemories,
+  tasksDueToday,
+  studyStreak,
+  hoursRecorded,
+  loading,
+}: DashboardStatsProps) {
+  const stats = [
+    { label: "Total Memories", value: totalMemories, icon: Brain, color: "#c96acb" },
+    { label: "Tasks Due Today", value: tasksDueToday, icon: CheckSquare, color: "#f59e0b" },
+    { label: "Study Streak", value: studyStreak, icon: Flame, color: "#f97316", suffix: "days" },
+    { label: "Hours Recorded", value: hoursRecorded, icon: Clock, color: "#3b82f6", suffix: "hrs" },
+  ];
+
   return (
     <div className="grid grid-cols-4 gap-4">
       {stats.map(({ label, value, icon: Icon, color, suffix }) => (
@@ -45,14 +38,17 @@ export default function DashboardStats() {
                 className="font-bold text-white"
                 style={{ fontFamily: "var(--font-syne)", fontSize: 32, lineHeight: 1 }}
               >
-                {value}
-                {suffix && (
-                  <span
-                    className="ml-1 font-normal"
-                    style={{ fontSize: 14, color: "#555" }}
-                  >
-                    {suffix}
-                  </span>
+                {loading ? (
+                  <span style={{ opacity: 0.3 }}>—</span>
+                ) : (
+                  <>
+                    {value}
+                    {suffix && (
+                      <span className="ml-1 font-normal" style={{ fontSize: 14, color: "#555" }}>
+                        {suffix}
+                      </span>
+                    )}
+                  </>
                 )}
               </p>
             </div>
