@@ -1,3 +1,5 @@
+import { prisma } from "@/lib/prisma";
+
 export interface DigestData {
   user: {
     name: string;
@@ -40,16 +42,20 @@ export async function generateFocusSuggestion(
   concepts: string[],
   pendingTasks: DigestData["pendingTasks"]
 ): Promise<string> {
+  if (sessions.length === 0) {
+    return "You haven't recorded any sessions this week. Start a recording to get personalised insights in your next digest.";
+  }
+
   const prompt = `You are Memo, a personal AI memory assistant. A user has just completed their week and here is what they recorded:
 
 Sessions this week:
 ${sessions.map((s) => `- ${s.title} (${s.duration}): ${s.summary}`).join("\n")}
 
 Key concepts absorbed:
-${concepts.join(", ")}
+${concepts.join(", ") || "none recorded"}
 
 Pending tasks not yet completed:
-${pendingTasks.map((t) => `- ${t.text} (${t.priority} priority${t.dueDate ? `, due ${t.dueDate}` : ""})`).join("\n")}
+${pendingTasks.map((t) => `- ${t.text} (${t.priority} priority${t.dueDate ? `, due ${t.dueDate}` : ""})`).join("\n") || "none"}
 
 Write a 3-5 sentence personalised focus suggestion for next week. Be specific to the actual content listed above — reference real topics, real tasks, real gaps you notice. Sound like a thoughtful personal tutor who actually read their notes, not a generic AI assistant. Do not start with "Based on your recordings" or any preamble. Just write the paragraph directly. Return only the paragraph, nothing else.`;
 
@@ -74,107 +80,95 @@ Write a 3-5 sentence personalised focus suggestion for next week. Be specific to
   return data.choices[0].message.content.trim();
 }
 
-export async function generateDigestData(userId: string): Promise<DigestData> {
-  // Mock data — replace with real DB queries when your database is live.
-  // Structure mirrors exactly what you'd return from Prisma/Supabase queries.
+function formatDuration(seconds: number): string {
+  const mins = Math.round(seconds / 60);
+  return `${mins} min`;
+}
 
-  const sessions: DigestData["sessions"] = [
-    {
-      title: "Biology — Photosynthesis Deep Dive",
-      date: "Monday, June 9",
-      duration: "47 min",
-      summary:
-        "Covered the light-dependent and light-independent reactions, with extended discussion on the role of chlorophyll and the electron transport chain. Several questions about the Calvin cycle remained unresolved.",
-    },
-    {
-      title: "Economics — Market Structures Lecture",
-      date: "Tuesday, June 10",
-      duration: "58 min",
-      summary:
-        "Detailed walkthrough of monopoly vs oligopoly pricing behaviour, including real-world case studies from the pharma industry. Includes key formulas for the upcoming Monday deadline.",
-    },
-    {
-      title: "Biology — Cellular Respiration Revision",
-      date: "Thursday, June 12",
-      duration: "32 min",
-      summary:
-        "Quick revision session linking ATP synthesis in mitochondria back to the electron transport chain concepts from Monday. Solidified understanding of glycolysis steps.",
-    },
-    {
-      title: "Philosophy — Epistemology Introduction",
-      date: "Friday, June 13",
-      duration: "41 min",
-      summary:
-        "First encounter with Descartes' Meditations and the methodological doubt framework. Recorded personal reflections on the relationship between rationalism and empiricism.",
-    },
-  ];
+function formatDate(date: Date): string {
+  return date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+}
 
-  const topConcepts: string[] = [
-    "Electron transport chain",
-    "Calvin cycle",
-    "Chlorophyll absorption",
-    "Monopoly pricing",
-    "Nash equilibrium",
-    "Glycolysis",
-    "Methodological doubt",
-    "ATP synthesis",
-  ];
+export async function generateDigestData(
+  userId: string,
+  userEmail: string,
+  userFirstName: string
+): Promise<DigestData> {
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 86400000);
 
-  const pendingTasks: DigestData["pendingTasks"] = [
-    {
-      text: "Submit Economics essay on market structures",
-      priority: "High",
-      dueDate: "Monday, June 16",
-      sourceSession: "Economics — Market Structures Lecture",
-    },
-    {
-      text: "Review light-dependent reaction diagrams before next bio lecture",
-      priority: "High",
-      sourceSession: "Biology — Photosynthesis Deep Dive",
-    },
-    {
-      text: "Read Descartes Meditations I and II in full",
-      priority: "Medium",
-      dueDate: "Wednesday, June 18",
-      sourceSession: "Philosophy — Epistemology Introduction",
-    },
-    {
-      text: "Create flashcard deck for ATP synthesis pathway",
-      priority: "Medium",
-      sourceSession: "Biology — Cellular Respiration Revision",
-    },
-    {
-      text: "Find oligopoly case study to add to essay",
-      priority: "Low",
-      sourceSession: "Economics — Market Structures Lecture",
-    },
-  ];
+  // Sessions recorded in the last 7 days
+  const weekSessions = await prisma.session.findMany({
+    where: { userId, createdAt: { gte: weekAgo, lte: now } },
+    orderBy: { createdAt: "asc" },
+    include: { tasks: true, flashcards: true },
+  });
 
-  const flashcardDecks: DigestData["flashcardDecks"] = [
-    { name: "Biology: Cell Biology Basics", cardCount: 34, lastReviewed: "8 days ago" },
-    { name: "Economics: Key Definitions", cardCount: 22, lastReviewed: "12 days ago" },
-    { name: "Philosophy: Core Arguments", cardCount: 18, lastReviewed: "14 days ago" },
-  ];
+  const sessions: DigestData["sessions"] = weekSessions.map((s) => ({
+    title: s.title,
+    date: formatDate(s.createdAt),
+    duration: formatDuration(s.duration),
+    summary: s.shortSummary,
+  }));
+
+  // Top concepts — flatten and dedupe keyConcepts across this week's sessions
+  const conceptSet = new Set<string>();
+  weekSessions.forEach((s) => s.keyConcepts.forEach((c) => conceptSet.add(c)));
+  const topConcepts = Array.from(conceptSet).slice(0, 10);
+
+  // Pending tasks — all incomplete tasks for the user (not just this week's),
+  // since "pending" means still outstanding regardless of when it was created
+  const incompleteTasks = await prisma.task.findMany({
+    where: { userId, done: false },
+    include: { session: { select: { title: true } } },
+    orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+    take: 10,
+  });
+
+  const pendingTasks: DigestData["pendingTasks"] = incompleteTasks.map((t) => ({
+    text: t.text,
+    priority: t.priority,
+    dueDate: t.dueDate
+      ? t.dueDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+      : undefined,
+    sourceSession: t.session.title,
+  }));
+
+  // Flashcard decks — group all-time flashcards by session
+  const sessionsWithCards = await prisma.session.findMany({
+    where: { userId, flashcards: { some: {} } },
+    orderBy: { createdAt: "desc" },
+    include: { flashcards: true },
+    take: 6,
+  });
+
+  const flashcardDecks: DigestData["flashcardDecks"] = sessionsWithCards.map((s) => ({
+    name: s.title,
+    cardCount: s.flashcards.length,
+    lastReviewed: formatDate(s.createdAt),
+  }));
+
+  const totalSeconds = weekSessions.reduce((acc, s) => acc + s.duration, 0);
+  const tasksExtractedThisWeek = weekSessions.reduce((acc, s) => acc + s.tasks.length, 0);
+  const flashcardsGeneratedThisWeek = weekSessions.reduce((acc, s) => acc + s.flashcards.length, 0);
 
   const focusSuggestion = await generateFocusSuggestion(sessions, topConcepts, pendingTasks);
 
   return {
     user: {
-      name: userId,
-      email: "user@example.com",
-      firstName: "there",
+      name: userFirstName,
+      email: userEmail,
+      firstName: userFirstName,
     },
     weekRange: {
-      start: "June 9, 2025",
-      end: "June 15, 2025",
+      start: formatDate(weekAgo),
+      end: formatDate(now),
     },
     stats: {
       sessionsRecorded: sessions.length,
-      hoursRecorded: Number(
-        (sessions.reduce((acc, s) => acc + parseInt(s.duration), 0) / 60).toFixed(1)
-      ),
-      tasksExtracted: pendingTasks.length,
-      flashcardsGenerated: flashcardDecks.reduce((acc, d) => acc + d.cardCount, 0),
+      hoursRecorded: Number((totalSeconds / 3600).toFixed(1)),
+      tasksExtracted: tasksExtractedThisWeek,
+      flashcardsGenerated: flashcardsGeneratedThisWeek,
     },
     sessions,
     topConcepts,
