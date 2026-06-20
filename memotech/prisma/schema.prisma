@@ -88,7 +88,20 @@ model ShareLink {
   lastViewedAt      DateTime?
 
   createdAt         DateTime  @default(now())
+  saves             ShareLinkSave[]
 
   @@index([sessionId])
   @@index([token])
+}
+
+model ShareLinkSave {
+  id             String    @id @default(cuid())
+  shareLinkId    String
+  shareLink      ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  savedBy        String
+  savedSessionId String
+  createdAt      DateTime  @default(now())
+
+  @@unique([shareLinkId, savedBy])
+  @@index([savedBy])
 }
