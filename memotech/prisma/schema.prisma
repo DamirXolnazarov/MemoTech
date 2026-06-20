@@ -1,11 +1,9 @@
 generator client {
   provider = "prisma-client-js"
 }
-
 datasource db {
   provider = "postgresql"
 }
-
 model Session {
   id              String   @id @default(cuid())
   userId          String
@@ -17,15 +15,13 @@ model Session {
   duration        Int
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-
   tasks      Task[]
   flashcards Flashcard[]
   keyMoments KeyMoment[]
-
+  shareLinks ShareLink[]
   @@index([userId])
   @@index([userId, createdAt])
 }
-
 model Task {
   id        String    @id @default(cuid())
   sessionId String
@@ -36,17 +32,14 @@ model Task {
   dueDate   DateTime?
   done      Boolean   @default(false)
   createdAt DateTime  @default(now())
-
   @@index([userId])
   @@index([sessionId])
 }
-
 enum Priority {
   High
   Medium
   Low
 }
-
 model Flashcard {
   id        String   @id @default(cuid())
   sessionId String
@@ -55,11 +48,9 @@ model Flashcard {
   question  String
   answer    String
   createdAt DateTime @default(now())
-
   @@index([userId])
   @@index([sessionId])
 }
-
 model KeyMoment {
   id        String   @id @default(cuid())
   sessionId String
@@ -69,10 +60,8 @@ model KeyMoment {
   quote     String
   why       String
   createdAt DateTime @default(now())
-
   @@index([sessionId])
 }
-
 model DigestSettings {
   id                  String   @id @default(cuid())
   userId              String   @unique
@@ -80,4 +69,26 @@ model DigestSettings {
   taskReminders       Boolean  @default(true)
   newFeatureEmails    Boolean  @default(false)
   updatedAt           DateTime @updatedAt
+}
+model ShareLink {
+  id                String    @id @default(cuid())
+  token             String    @unique @default(cuid())
+  sessionId         String
+  session           Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdBy         String
+
+  includeSummary    Boolean   @default(true)
+  includeConcepts   Boolean   @default(true)
+  includeFlashcards Boolean   @default(true)
+  includeTasks      Boolean   @default(false)
+
+  expiresAt         DateTime?
+  revokedAt         DateTime?
+  viewCount         Int       @default(0)
+  lastViewedAt      DateTime?
+
+  createdAt         DateTime  @default(now())
+
+  @@index([sessionId])
+  @@index([token])
 }
