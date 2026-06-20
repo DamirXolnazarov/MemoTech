@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import TopBar from "@/components/app/TopBar";
 import { Search } from "lucide-react";
+import Link from "next/link";
 
 interface SessionItem {
   id: string;
@@ -178,11 +179,12 @@ export default function MemoriesPage() {
         ) : (
           <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
             {filtered.map((s) => (
-              <div
-                key={s.id}
-                className="group rounded-xl border p-5 flex flex-col gap-3 relative overflow-hidden cursor-pointer transition-all hover:border-[#2a2a2a]"
-                style={{ background: "#0b0b0b", borderColor: "#1a1a1a" }}
-              >
+             <Link
+  key={s.id}
+  href={`/app/memories/${s.id}`}
+  className="group rounded-xl border p-5 flex flex-col gap-3 relative overflow-hidden cursor-pointer transition-all hover:border-[#2a2a2a]"
+  style={{ background: "#0b0b0b", borderColor: "#1a1a1a" }}
+>
                 <div
                   className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 rounded-xl"
                   style={{ background: "rgba(5,5,5,0.85)" }}
@@ -234,7 +236,7 @@ export default function MemoriesPage() {
                     </span>
                   )}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

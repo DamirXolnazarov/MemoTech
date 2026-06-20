@@ -6,6 +6,8 @@ import TranscriptTab from "./tabs/TranscriptTab";
 import TasksTab from "./tabs/TasksTab";
 import FlashcardsTab from "./tabs/FlashcardsTab";
 import KeyMomentsTab from "./tabs/KeyMomentsTab";
+import { Share2 } from "lucide-react";
+import ShareModal from "./ShareModal";
 import AskMemoTab from "./tabs/AskMemoTab";
 
 type Tab = "summary" | "transcript" | "tasks" | "flashcards" | "keyMoments" | "askMemo";
@@ -25,6 +27,13 @@ interface SessionResultsProps {
   transcript: string;
   duration: number;
   onReset: () => void;
+  /** "live": just-processed, unsaved recording (default).
+   *  "saved": viewing an existing session fetched from the DB. */
+  mode?: "live" | "saved";
+  /** Required when mode="saved" — the real DB session id. */
+  sessionId?: string;
+  /** Optional: real createdAt for saved sessions, instead of "today". */
+  createdAt?: string;
 }
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -56,11 +65,25 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   },
 ];
 
-export default function SessionResults({ data, transcript, duration, onReset }: SessionResultsProps) {
+export default function SessionResults({
+  data,
+  transcript,
+  duration,
+  onReset,
+  mode = "live",
+  sessionId,
+  createdAt,
+}: SessionResultsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("summary");
   const [tabVisible, setTabVisible] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [liveSavedSessionId, setLiveSavedSessionId] = useState<string | null>(null);
+
+  // The id usable for Share: either the real DB id (mode="saved"),
+  // or the id captured after a successful live save.
+  const shareableSessionId = mode === "saved" ? sessionId ?? null : liveSavedSessionId;
 
   const switchTab = (tab: Tab) => {
     if (tab === activeTab) return;
@@ -95,6 +118,11 @@ export default function SessionResults({ data, transcript, duration, onReset }: 
         throw new Error(body?.error || "Failed to save session");
       }
 
+      const body = await res.json();
+      if (body?.session?.id) {
+        setLiveSavedSessionId(body.session.id);
+      }
+
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2500);
     } catch (err) {
@@ -104,7 +132,9 @@ export default function SessionResults({ data, transcript, duration, onReset }: 
     }
   };
 
-  const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const date = createdAt
+    ? new Date(createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+    : new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
   const saveLabel =
     saveState === "saving" ? "Saving..." :
@@ -168,25 +198,46 @@ export default function SessionResults({ data, transcript, duration, onReset }: 
 
         {/* Actions */}
         <div style={{ padding: "12px 12px 20px", borderTop: "1px solid #111", display: "flex", flexDirection: "column", gap: 8 }}>
+          {mode === "live" && (
+            <button
+              onClick={handleSave}
+              disabled={saveState === "saving"}
+              style={{
+                fontFamily: "var(--font-inter)", fontSize: 12,
+                color: saveState === "saved" ? "#c96acb" : saveState === "error" ? "#f87171" : "#fff",
+                background:
+                  saveState === "saved" ? "rgba(201,106,203,0.1)" :
+                  saveState === "error" ? "rgba(239,68,68,0.1)" :
+                  saveState === "saving" ? "#8a4d8c" : "#c96acb",
+                border:
+                  saveState === "saved" ? "1px solid rgba(201,106,203,0.3)" :
+                  saveState === "error" ? "1px solid rgba(239,68,68,0.3)" : "none",
+                borderRadius: 8, padding: "7px 10px",
+                cursor: saveState === "saving" ? "default" : "pointer",
+                transition: "all 0.2s ease", fontWeight: 500,
+              }}
+            >
+              {saveLabel}
+            </button>
+          )}
+
           <button
-            onClick={handleSave}
-            disabled={saveState === "saving"}
+            onClick={() => shareableSessionId && setShareModalOpen(true)}
+            disabled={!shareableSessionId}
+            title={!shareableSessionId ? "Save the session before sharing" : undefined}
             style={{
-              fontFamily: "var(--font-inter)", fontSize: 12,
-              color: saveState === "saved" ? "#c96acb" : saveState === "error" ? "#f87171" : "#fff",
-              background:
-                saveState === "saved" ? "rgba(201,106,203,0.1)" :
-                saveState === "error" ? "rgba(239,68,68,0.1)" :
-                saveState === "saving" ? "#8a4d8c" : "#c96acb",
-              border:
-                saveState === "saved" ? "1px solid rgba(201,106,203,0.3)" :
-                saveState === "error" ? "1px solid rgba(239,68,68,0.3)" : "none",
+              display: "flex", alignItems: "center", gap: 8,
               borderRadius: 8, padding: "7px 10px",
-              cursor: saveState === "saving" ? "default" : "pointer",
-              transition: "all 0.2s ease", fontWeight: 500,
+              fontFamily: "var(--font-inter)", fontSize: 12, fontWeight: 500,
+              color: shareableSessionId ? "#fff" : "#444",
+              background: "transparent",
+              border: `1px solid ${shareableSessionId ? "#222" : "#161616"}`,
+              cursor: shareableSessionId ? "pointer" : "not-allowed",
+              transition: "border-color 0.15s ease",
             }}
           >
-            {saveLabel}
+            <Share2 size={14} />
+            Share
           </button>
 
           {saveState === "error" && errorMsg && (
@@ -206,7 +257,7 @@ export default function SessionResults({ data, transcript, duration, onReset }: 
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.44"/>
             </svg>
-            New recording
+            {mode === "saved" ? "Back to Memories" : "New recording"}
           </button>
         </div>
       </div>
@@ -226,6 +277,13 @@ export default function SessionResults({ data, transcript, duration, onReset }: 
           {activeTab === "askMemo" && <AskMemoTab transcript={transcript} />}
         </div>
       </div>
+
+      {shareModalOpen && shareableSessionId && (
+        <ShareModal
+          sessionId={shareableSessionId}
+          onClose={() => setShareModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
