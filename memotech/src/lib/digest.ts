@@ -97,7 +97,6 @@ export async function generateDigestData(
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 86400000);
 
-  // Sessions recorded in the last 7 days
   const weekSessions = await prisma.session.findMany({
     where: { userId, createdAt: { gte: weekAgo, lte: now } },
     orderBy: { createdAt: "asc" },
@@ -111,13 +110,10 @@ export async function generateDigestData(
     summary: s.shortSummary,
   }));
 
-  // Top concepts — flatten and dedupe keyConcepts across this week's sessions
   const conceptSet = new Set<string>();
   weekSessions.forEach((s) => s.keyConcepts.forEach((c) => conceptSet.add(c)));
   const topConcepts = Array.from(conceptSet).slice(0, 10);
 
-  // Pending tasks — all incomplete tasks for the user (not just this week's),
-  // since "pending" means still outstanding regardless of when it was created
   const incompleteTasks = await prisma.task.findMany({
     where: { userId, done: false },
     include: { session: { select: { title: true } } },
@@ -134,7 +130,6 @@ export async function generateDigestData(
     sourceSession: t.session.title,
   }));
 
-  // Flashcard decks — group all-time flashcards by session
   const sessionsWithCards = await prisma.session.findMany({
     where: { userId, flashcards: { some: {} } },
     orderBy: { createdAt: "desc" },
