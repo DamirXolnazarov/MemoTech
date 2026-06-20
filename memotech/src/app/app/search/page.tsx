@@ -1,38 +1,85 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TopBar from "@/components/app/TopBar";
 import { Search } from "lucide-react";
 
 const SUGGESTED_QUERIES = [
-  "What did I learn about photosynthesis?",
-  "What tasks are due this week?",
-  "Summarize my meeting notes",
-  "What is RuBisCO?",
-  "Key points from my economics lecture",
+  "What did I learn this week?",
+  "What tasks are due soon?",
+  "Summarize my most recent recording",
+  "What topics have I covered the most?",
 ];
 
-// TODO: Replace with real session context from DB — fetch all user sessions for RAG
-const MOCK_SESSION_CONTEXT = `
-Session: Biology 201 — Photosynthesis
-Summary: Covered the light-dependent and light-independent reactions of photosynthesis, including the role of chlorophyll and ATP synthesis in chloroplasts.
-
-Session: Machine Learning — Neural Networks
-Summary: Deep dive into backpropagation, gradient descent, and activation functions. Covered ReLU vs sigmoid trade-offs.
-
-Session: Economics Lecture — Supply & Demand
-Summary: Explored price elasticity, market equilibrium, and how external shocks shift supply and demand curves in real-world markets.
-
-Session: Project Kickoff Meeting
-Summary: Aligned the team on Q3 product goals, assigned ownership for key features, and set sprint cadence.
-`;
+interface SessionLite {
+  id: string;
+  title: string;
+  shortSummary: string;
+  detailedSummary: string;
+  keyConcepts: string[];
+  createdAt: string;
+}
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [answer, setAnswer] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [sources] = useState(["Biology 201 — Photosynthesis", "Machine Learning — Neural Networks"]);
+  const [sources, setSources] = useState<string[]>([]);
+
+  const [sessions, setSessions] = useState<SessionLite[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchSessions() {
+      try {
+        const res = await fetch("/api/sessions");
+        if (!res.ok) throw new Error("Failed to fetch sessions");
+        const json = await res.json();
+        if (!cancelled) {
+          const mapped: SessionLite[] = (json.sessions ?? []).map(
+            (s: {
+              id: string;
+              title: string;
+              shortSummary: string;
+              detailedSummary: string;
+              keyConcepts: string[];
+              createdAt: string;
+            }) => ({
+              id: s.id,
+              title: s.title,
+              shortSummary: s.shortSummary,
+              detailedSummary: s.detailedSummary,
+              keyConcepts: s.keyConcepts,
+              createdAt: s.createdAt,
+            })
+          );
+          setSessions(mapped);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!cancelled) setSessionsLoading(false);
+      }
+    }
+
+    fetchSessions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const buildContext = (): string => {
+    if (sessions.length === 0) return "";
+    return sessions
+      .map(
+        (s) =>
+          `Session: ${s.title}\nDate: ${new Date(s.createdAt).toLocaleDateString()}\nSummary: ${s.shortSummary}\nDetails: ${s.detailedSummary}\nKey concepts: ${s.keyConcepts.join(", ")}`
+      )
+      .join("\n\n");
+  };
 
   const handleSearch = async (q: string) => {
     if (!q.trim() || streaming) return;
@@ -41,13 +88,24 @@ export default function SearchPage() {
     setAnswer("");
     setStreaming(true);
 
+    const context = buildContext();
+
+    if (!context) {
+      setAnswer(
+        "You haven't recorded any sessions yet, so there's nothing for me to search through. Record your first session and come back!"
+      );
+      setStreaming(false);
+      setSources([]);
+      return;
+    }
+
     try {
       const res = await fetch("/api/ask-memo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [{ role: "user", content: q }],
-          transcript: MOCK_SESSION_CONTEXT,
+          transcript: context,
         }),
       });
 
@@ -63,8 +121,21 @@ export default function SearchPage() {
         full += decoder.decode(value, { stream: true });
         setAnswer(full);
       }
+
+      // Simple relevance heuristic: sessions whose title or concepts appear
+      // referenced in the answer, falling back to most recent sessions
+      const lowerAnswer = full.toLowerCase();
+      const relevant = sessions.filter(
+        (s) =>
+          lowerAnswer.includes(s.title.toLowerCase()) ||
+          s.keyConcepts.some((c) => lowerAnswer.includes(c.toLowerCase()))
+      );
+      setSources(
+        (relevant.length > 0 ? relevant : sessions.slice(0, 3)).map((s) => s.title)
+      );
     } catch {
       setAnswer("Sorry, something went wrong. Please try again.");
+      setSources([]);
     } finally {
       setStreaming(false);
     }
@@ -86,7 +157,14 @@ export default function SearchPage() {
             value={query}
             onChange={(e) => { setQuery(e.target.value); if (submitted) setSubmitted(false); }}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            placeholder="Ask Memo anything about your recordings…"
+            placeholder={
+              sessionsLoading
+                ? "Loading your recordings..."
+                : sessions.length === 0
+                ? "Record a session first to search your recordings..."
+                : "Ask Memo anything about your recordings…"
+            }
+            disabled={sessionsLoading}
             style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontFamily: "var(--font-inter)", fontSize: 15, color: "#ccc" }}
             autoFocus
           />
@@ -102,7 +180,7 @@ export default function SearchPage() {
         </div>
 
         {/* Suggested searches */}
-        {!submitted && (
+        {!submitted && sessions.length > 0 && (
           <div className="flex flex-col gap-4">
             <p style={{ fontFamily: "var(--font-syne)", fontSize: 12, color: "#444", letterSpacing: "0.08em", textTransform: "uppercase" }}>
               Suggested
@@ -122,10 +200,24 @@ export default function SearchPage() {
           </div>
         )}
 
+        {/* Empty state — no sessions at all */}
+        {!submitted && !sessionsLoading && sessions.length === 0 && (
+          <div
+            className="rounded-xl border flex flex-col items-center justify-center gap-3 py-20"
+            style={{ background: "#0b0b0b", borderColor: "#1a1a1a" }}
+          >
+            <p style={{ color: "#666", fontSize: 16, fontFamily: "var(--font-syne)", fontWeight: 600 }}>
+              Nothing to search yet
+            </p>
+            <p style={{ color: "#444", fontSize: 13, fontFamily: "var(--font-inter)", maxWidth: 320, textAlign: "center" }}>
+              Once you record a session, you can ask Memo questions about it here.
+            </p>
+          </div>
+        )}
+
         {/* Answer */}
         {submitted && (
           <div className="flex flex-col gap-4">
-            {/* Result card */}
             <div
               className="rounded-xl border p-6"
               style={{ background: "#0b0b0b", borderColor: "rgba(201,106,203,0.25)", borderLeft: "3px solid #c96acb" }}
@@ -135,8 +227,7 @@ export default function SearchPage() {
               </p>
             </div>
 
-            {/* Sources */}
-            {!streaming && answer && (
+            {!streaming && answer && sources.length > 0 && (
               <div className="flex flex-col gap-2">
                 <p style={{ fontFamily: "var(--font-syne)", fontSize: 11, color: "#444", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   Sources
@@ -155,9 +246,8 @@ export default function SearchPage() {
               </div>
             )}
 
-            {/* New search */}
             <button
-              onClick={() => { setSubmitted(false); setQuery(""); setAnswer(""); }}
+              onClick={() => { setSubmitted(false); setQuery(""); setAnswer(""); setSources([]); }}
               style={{ color: "#444", fontFamily: "var(--font-inter)", fontSize: 13, background: "transparent", border: "none", cursor: "pointer", alignSelf: "flex-start" }}
             >
               ← New search
