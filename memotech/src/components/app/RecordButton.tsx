@@ -55,10 +55,17 @@ export default function RecordButton({
   const [isMobile, setIsMobile] = useState<boolean | null>(null);
   const [hasSpeechSupport, setHasSpeechSupport] = useState(true);
 
-  useEffect(() => {
-    setIsMobile(isMobileDevice());
+  const checkMobileStatus = useCallback(() => {
+    const mobile = isMobileDevice() || window.innerWidth < 768;
+    setIsMobile(mobile);
     setHasSpeechSupport(!!getSR());
   }, []);
+
+  useEffect(() => {
+    checkMobileStatus();
+    window.addEventListener("resize", checkMobileStatus);
+    return () => window.removeEventListener("resize", checkMobileStatus);
+  }, [checkMobileStatus]);
 
   // Avoid SSR/CSR mismatch — render nothing meaningful until we know
   // which path to take (this resolves in a single render frame)
@@ -269,13 +276,7 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
             {formatTime(timer)}
           </span>
         </div>
-      ) : (
-        <div className="flex flex-col items-center gap-2 md:hidden">
-          <div className="flex items-center justify-center rounded-full" style={{ width: 64, height: 64, background: "rgba(201,106,203,0.08)", border: "1px solid rgba(201,106,203,0.2)" }}>
-            <Mic size={26} style={{ color: "#c96acb" }} />
-          </div>
-        </div>
-      )}
+      ) : null}
 
       <div className="flex items-end gap-1 transition-opacity duration-300" style={{ height: 48, opacity: recState === "recording" ? 1 : 0 }}>
         {bars.map((h, i) => (

@@ -235,14 +235,7 @@ export default function MobileAudioRecorder({
       )}
 
       {recState === "idle" && (
-        <div className="flex flex-col items-center gap-2">
-          <div
-            className="flex items-center justify-center rounded-full"
-            style={{ width: 64, height: 64, background: "rgba(201,106,203,0.08)", border: "1px solid rgba(201,106,203,0.2)" }}
-          >
-            <Mic size={26} style={{ color: "#c96acb" }} />
-          </div>
-        </div>
+        null
       )}
 
       <div className="relative flex items-center justify-center">

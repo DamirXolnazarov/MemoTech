@@ -307,7 +307,7 @@ function DesktopHero() {
         <PersonSVG wrapRef={personWrapRef} />
         <MouthWaves waveRefs={mouthWaveRefs} />
 
-        <div ref={micWrapRef} style={{ position: "absolute", top: "calc(50% + 60px)", left: "50%", transform: "translate(-50%, -52%)", zIndex: 5, pointerEvents: "none" }}>
+        <div ref={micWrapRef} style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -52%)", zIndex: 5, pointerEvents: "none" }}>
           <MicSVG svgRef={micSvgRef} />
         </div>
 
@@ -381,7 +381,7 @@ function MobileHero() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "32px 24px",
+        padding: "145px 24px",
         textAlign: "center",
         background: `
           radial-gradient(ellipse 90% 50% at 50% 30%, rgba(201,106,203,0.18) 0%, transparent 65%),
