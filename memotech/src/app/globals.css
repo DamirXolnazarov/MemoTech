@@ -3,10 +3,13 @@
 @tailwind utilities;
 
 /* === Prevent horizontal overflow app-wide === */
-html, body {
-  overflow-x: hidden;
-  width: 100%;
-  max-width: 100vw;
+/* === Prevent horizontal overflow app-wide === */
+html {
+  /* Do NOT set overflow-x here — breaks ScrollTrigger */
+}
+
+body {
+  overflow-x: clip; /* clip instead of hidden — doesn't create new scroll context */
 }
 
 #__next, body > div:first-child {
@@ -51,6 +54,10 @@ body {
 
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+#__next, main {
+  overflow-x: clip;
 }
 
 body {

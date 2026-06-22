@@ -39,14 +39,10 @@ function TasksVisual() {
       {tasks.map((t) => (
         <div key={t.label} className="flex items-center gap-2.5 py-2.5 text-xs text-[#a1a1aa]">
           <div className={`w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center ${t.done ? "bg-[#c96acb] border-[#c96acb]" : "border-[#2a2a2a]"}`}>
-            {t.done && (
-              <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-                <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
+            {t.done && <svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
           </div>
-          <span className={t.done ? "line-through text-[#52525b]" : ""}>{t.label}</span>
-          <span className="ml-auto text-[11px] text-[#52525b]">{t.date}</span>
+          <span className={t.done ? "line-through text-[#52525b] truncate" : "truncate"}>{t.label}</span>
+          <span className="ml-auto text-[11px] text-[#52525b] flex-shrink-0">{t.date}</span>
         </div>
       ))}
     </div>
@@ -56,9 +52,9 @@ function TasksVisual() {
 function SearchVisual() {
   return (
     <div className="w-full space-y-3">
-      <div className="border border-[#2a2a2a] rounded-xl px-4 py-3 text-xs text-[#a1a1aa] flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.04)" }}>
+      <div className="border border-[#2a2a2a] rounded-xl px-3 py-3 text-xs text-[#a1a1aa] flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.04)" }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#52525b" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        What did Prof. Karimov say about mitosis?
+        <span className="truncate">What did Prof. Karimov say about mitosis?</span>
       </div>
       <div className="rounded-xl p-4" style={{ background: "rgba(201,106,203,0.06)", border: "1px solid rgba(201,106,203,0.15)" }}>
         <p className="text-xs text-white leading-relaxed mb-2">Mitosis was described as having four stages — prophase, metaphase, anaphase, and telophase — with emphasis on spindle fiber alignment during metaphase.</p>
@@ -89,13 +85,11 @@ export function HowItWorksSection() {
   useEffect(() => {
     const update = () => {
       const mid = window.innerHeight / 2;
-      let closest = 0;
-      let closestDist = Infinity;
+      let closest = 0, closestDist = Infinity;
       rowRefs.current.forEach((row, i) => {
         if (!row) return;
         const rect = row.getBoundingClientRect();
-        const center = rect.top + rect.height / 2;
-        const dist = Math.abs(center - mid);
+        const dist = Math.abs(rect.top + rect.height / 2 - mid);
         if (dist < closestDist) { closestDist = dist; closest = i; }
       });
       dotRefs.current.forEach((dot, i) => {
@@ -117,38 +111,52 @@ export function HowItWorksSection() {
   }, []);
 
   return (
-    <section id="how" className="max-w-6xl mx-auto px-12 py-28 border-t border-[#1a1a1a]">
+    <section id="how" className="max-w-6xl mx-auto px-5 sm:px-8 md:px-12 py-20 md:py-28 border-t border-[#1a1a1a]">
       <RevealOnScroll>
         <Eyebrow className="mb-4">How it works</Eyebrow>
-        <h2 className="text-5xl md:text-6xl font-extrabold leading-tight tracking-tight text-white" style={{ fontFamily: "var(--font-syne)", letterSpacing: "-0.03em" }}>
+        <h2 className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight tracking-tight text-white" style={{ fontFamily: "var(--font-syne)", letterSpacing: "-0.03em" }}>
           Four steps.<br />Zero effort.
         </h2>
       </RevealOnScroll>
 
-      <div className="mt-20 ml-6 pl-12 border-l border-[#1a1a1a] divide-y divide-[#1a1a1a]">
-        {STEPS.map((s, i) => (
-          <RevealOnScroll key={s.step} delay={i * 60} className="py-16">
-            <div
-              ref={(el) => { rowRefs.current[i] = el; }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center relative"
-            >
-              {/* Scroll-driven dot — no hardcoded i===0 */}
-              <div
-                ref={(el) => { dotRefs.current[i] = el; }}
-                className="absolute -left-[61px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full border bg-[#050505] border-[#2a2a2a]"
-                style={{ transition: "background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease" }}
-              />
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c96acb] mb-3.5" style={{ fontFamily: "var(--font-syne)" }}>Step {s.step}</div>
-                <h3 className="text-2xl font-bold text-white mb-3.5" style={{ fontFamily: "var(--font-syne)", letterSpacing: "-0.02em" }}>{s.title}</h3>
-                <p className="text-sm text-[#a1a1aa] leading-relaxed">{s.description}</p>
+      {/* Timeline — desktop: left border with dot; mobile: simple stacked cards */}
+      <div className="mt-16 md:mt-20">
+        {/* Desktop timeline */}
+        <div className="hidden md:block ml-6 pl-12 border-l border-[#1a1a1a] divide-y divide-[#1a1a1a]">
+          {STEPS.map((s, i) => (
+            <RevealOnScroll key={s.step} delay={i * 60} className="py-16">
+              <div ref={(el) => { rowRefs.current[i] = el; }} className="grid grid-cols-2 gap-20 items-center relative">
+                <div
+                  ref={(el) => { dotRefs.current[i] = el; }}
+                  className="absolute -left-[61px] top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full border bg-[#050505] border-[#2a2a2a]"
+                  style={{ transition: "background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease" }}
+                />
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c96acb] mb-3.5" style={{ fontFamily: "var(--font-syne)" }}>Step {s.step}</div>
+                  <h3 className="text-2xl font-bold text-white mb-3.5" style={{ fontFamily: "var(--font-syne)", letterSpacing: "-0.02em" }}>{s.title}</h3>
+                  <p className="text-sm text-[#a1a1aa] leading-relaxed">{s.description}</p>
+                </div>
+                <div className="bg-[#0b0b0b] border border-[#1a1a1a] rounded-2xl p-8 min-h-[180px] flex items-center justify-center">
+                  {VISUALS[s.visual]}
+                </div>
               </div>
-              <div className="bg-[#0b0b0b] border border-[#1a1a1a] rounded-2xl p-8 min-h-[180px] flex items-center justify-center">
+            </RevealOnScroll>
+          ))}
+        </div>
+
+        {/* Mobile: simple stacked cards, no timeline chrome */}
+        <div className="md:hidden space-y-4 mt-8">
+          {STEPS.map((s) => (
+            <div key={s.step} className="bg-[#0b0b0b] border border-[#1a1a1a] rounded-2xl p-6">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c96acb] mb-2" style={{ fontFamily: "var(--font-syne)" }}>Step {s.step}</div>
+              <h3 className="text-lg font-bold text-white mb-2" style={{ fontFamily: "var(--font-syne)", letterSpacing: "-0.02em" }}>{s.title}</h3>
+              <p className="text-sm text-[#a1a1aa] leading-relaxed mb-5">{s.description}</p>
+              <div className="bg-[#111] border border-[#1a1a1a] rounded-xl p-5 flex items-center justify-center min-h-[120px]">
                 {VISUALS[s.visual]}
               </div>
             </div>
-          </RevealOnScroll>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
   );
