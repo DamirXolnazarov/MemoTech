@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Sidebar />
       </div>
 
-      <main className="flex-1 min-h-screen md:ml-[240px] pb-[calc(56px+env(safe-area-inset-bottom,0px))] md:pb-0">
+      <main className="flex-1 min-h-screen md:ml-[240px] pb-[calc(56px+env(safe-area-inset-bottom,0px))] md:pb-0 overflow-x-hidden">
         {children}
       </main>
 

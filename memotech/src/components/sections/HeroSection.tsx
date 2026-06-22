@@ -307,7 +307,7 @@ function DesktopHero() {
         <PersonSVG wrapRef={personWrapRef} />
         <MouthWaves waveRefs={mouthWaveRefs} />
 
-        <div ref={micWrapRef} style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -52%)", zIndex: 5, pointerEvents: "none" }}>
+        <div ref={micWrapRef} style={{ position: "absolute", top: "calc(50% + 60px)", left: "50%", transform: "translate(-50%, -52%)", zIndex: 5, pointerEvents: "none" }}>
           <MicSVG svgRef={micSvgRef} />
         </div>
 
