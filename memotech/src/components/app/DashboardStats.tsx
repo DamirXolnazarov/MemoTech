@@ -18,43 +18,57 @@ export default function DashboardStats({
   loading,
 }: DashboardStatsProps) {
   const stats = [
-    { label: "Total Memories", value: totalMemories, icon: Brain, color: "#c96acb" },
-    { label: "Tasks Due Today", value: tasksDueToday, icon: CheckSquare, color: "#f59e0b" },
-    { label: "Study Streak", value: studyStreak, icon: Flame, color: "#f97316", suffix: "days" },
-    { label: "Hours Recorded", value: hoursRecorded, icon: Clock, color: "#3b82f6", suffix: "hrs" },
+    { label: "Memories", value: totalMemories, icon: Brain, color: "#c96acb" },
+    { label: "Hours Recorded", value: hoursRecorded, icon: Clock, color: "#60a5fa", suffix: "h" },
+    { label: "Tasks due", value: tasksDueToday, icon: CheckSquare, color: "#c96acb" },
+    { label: "Streak", value: studyStreak, icon: Flame, color: "#34d399", suffix: studyStreak === 1 ? "day" : "days", highlight: true },
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-4">
-      {stats.map(({ label, value, icon: Icon, color, suffix }) => (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+      {stats.map(({ label, value, icon: Icon, color, suffix, highlight }) => (
         <div
           key={label}
-          className="rounded-xl border p-5 flex flex-col gap-4"
-          style={{ background: "#0b0b0b", borderColor: "#1a1a1a" }}
+          className="rounded-2xl border flex flex-col justify-between"
+          style={{
+            background: "#0e0a10",
+            borderColor: "#1c1620",
+            padding: "18px 16px",
+            minHeight: 104,
+          }}
         >
-          <div className="flex items-start justify-between">
-            <div>
-              <p
-                className="font-bold text-white"
-                style={{ fontFamily: "var(--font-syne)", fontSize: 32, lineHeight: 1 }}
-              >
-                {loading ? (
-                  <span style={{ opacity: 0.3 }}>—</span>
-                ) : (
-                  <>
-                    {value}
-                    {suffix && (
-                      <span className="ml-1 font-normal" style={{ fontSize: 14, color: "#555" }}>
-                        {suffix}
-                      </span>
-                    )}
-                  </>
-                )}
-              </p>
-            </div>
-            <Icon size={22} style={{ color }} />
+          <div className="flex items-start justify-between mb-2 md:hidden">
+            {/* mobile: icon hidden per mockup, numbers do the talking */}
           </div>
-          <p style={{ color: "#a1a1aa", fontSize: 13, fontFamily: "var(--font-inter)" }}>
+          <div className="hidden md:flex items-start justify-between mb-3">
+            <Icon size={20} style={{ color }} />
+          </div>
+
+          {loading ? (
+            <div
+              style={{ width: 56, height: 30, borderRadius: 8, background: "#1c1620" }}
+              className="animate-pulse"
+            />
+          ) : (
+            <p
+              className="font-bold leading-none"
+              style={{
+                fontFamily: "var(--font-syne)",
+                fontSize: 30,
+                color: highlight ? "#34d399" : "#fff",
+              }}
+            >
+              {value}
+              {suffix && (
+                <span style={{ fontSize: 16, fontWeight: 700, marginLeft: 3 }}>{suffix}</span>
+              )}
+            </p>
+          )}
+
+          <p
+            className="mt-1"
+            style={{ color: "#71717a", fontSize: 13, fontFamily: "var(--font-inter)" }}
+          >
             {label}
           </p>
         </div>

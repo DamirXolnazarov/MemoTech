@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { ArrowRight } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -71,8 +72,11 @@ export default function AskMemoTab({ transcript }: AskMemoTabProps) {
   };
 
   return (
-    <div className="flex flex-col" style={{ height: "60vh" }}>
-      <h2 style={{ fontFamily: "var(--font-syne)", fontSize: 18, fontWeight: 600, color: "#f0f0f0", marginBottom: 20 }}>
+    <div className="flex flex-col" style={{ height: "calc(100vh - 280px)", minHeight: 400 }}>
+      <h2
+        className="hidden md:block"
+        style={{ fontFamily: "var(--font-syne)", fontSize: 18, fontWeight: 600, color: "#f0f0f0", marginBottom: 20 }}
+      >
         Ask Memo
       </h2>
 
@@ -84,22 +88,28 @@ export default function AskMemoTab({ transcript }: AskMemoTabProps) {
               <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
               <line x1="12" y1="19" x2="12" y2="23" />
             </svg>
-            <p style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "#555", textAlign: "center" }}>
+            <p style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "#71717a", textAlign: "center" }}>
               Ask anything about your recording
             </p>
           </div>
         )}
         {messages.map((m, i) => (
           <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
-            <div style={{
-              maxWidth: "80%", padding: "10px 16px",
-              borderRadius: m.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-              background: m.role === "user" ? "#c96acb" : "#0f0f0f",
-              border: m.role === "user" ? "none" : "1px solid #1a1a1a",
-              fontFamily: "var(--font-inter)", fontSize: 14,
-              color: m.role === "user" ? "#fff" : "#ccc",
-              lineHeight: 1.6, whiteSpace: "pre-wrap",
-            }}>
+            <div
+              style={{
+                maxWidth: "85%",
+                padding: "11px 16px",
+                borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                background: m.role === "user" ? "#c96acb" : "#0e0a10",
+                border: m.role === "user" ? "none" : "1px solid #1c1620",
+                fontFamily: "var(--font-inter)",
+                fontSize: 14.5,
+                color: m.role === "user" ? "#0a0a0a" : "#d4d4d8",
+                fontWeight: m.role === "user" ? 500 : 400,
+                lineHeight: 1.6,
+                whiteSpace: "pre-wrap",
+              }}
+            >
               {m.content || (m.role === "assistant" && streaming ? <span style={{ opacity: 0.4 }}>●●●</span> : "")}
             </div>
           </div>
@@ -107,37 +117,57 @@ export default function AskMemoTab({ transcript }: AskMemoTabProps) {
         <div ref={bottomRef} />
       </div>
 
-      {error && <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#f87171", marginBottom: 8 }}>{error}</p>}
+      {error && (
+        <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#f87171", marginBottom: 8 }}>{error}</p>
+      )}
 
       {messages.length === 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-col gap-2 mb-4">
           {SUGGESTED.map((q) => (
-            <button key={q} onClick={() => send(q)} style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#888", background: "transparent", border: "1px solid #1a1a1a", borderRadius: 20, padding: "5px 14px", cursor: "pointer", transition: "border-color 0.2s ease" }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#c96acb")}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#1a1a1a")}>
+            <button
+              key={q}
+              onClick={() => send(q)}
+              className="text-left rounded-2xl transition-colors"
+              style={{
+                fontFamily: "var(--font-inter)", fontSize: 14, color: "#a1a1aa",
+                background: "#0e0a10", border: "1px solid #1c1620",
+                padding: "12px 16px",
+              }}
+            >
               {q}
             </button>
           ))}
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, background: "#0b0b0b", border: "1px solid #1a1a1a", borderRadius: 12, padding: "8px 8px 8px 16px", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex", gap: 10, background: "#0e0a10", border: "1px solid #1c1620",
+          borderRadius: 28, padding: "6px 6px 6px 18px", alignItems: "center",
+        }}
+      >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), send(input))}
-          placeholder="Ask about your recording…"
+          placeholder="Ask anything about your memories…"
           disabled={streaming}
-          style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontFamily: "var(--font-inter)", fontSize: 14, color: "#ccc" }}
+          style={{
+            flex: 1, background: "transparent", border: "none", outline: "none",
+            fontFamily: "var(--font-inter)", fontSize: 14.5, color: "#d4d4d8",
+          }}
         />
         <button
           onClick={() => send(input)}
           disabled={streaming || !input.trim()}
-          style={{ width: 34, height: 34, borderRadius: 8, background: input.trim() && !streaming ? "#c96acb" : "#1a1a1a", border: "none", cursor: input.trim() && !streaming ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s ease" }}
+          className="flex items-center justify-center transition-transform active:scale-90"
+          style={{
+            width: 38, height: 38, borderRadius: "50%",
+            background: input.trim() && !streaming ? "#c96acb" : "#1c1620",
+            border: "none", flexShrink: 0,
+          }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
+          <ArrowRight size={16} color="#0a0a0a" strokeWidth={2.5} />
         </button>
       </div>
     </div>

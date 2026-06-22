@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { Square, Mic } from "lucide-react";
+import MobileAudioRecorder from "./MobileAudioRecorder";
 
-interface SpeechRecognitionResultItem {
-  transcript: string;
-}
+interface SpeechRecognitionResultItem { transcript: string; }
 interface SpeechRecognitionResult {
   isFinal: boolean;
   [index: number]: SpeechRecognitionResultItem;
@@ -27,9 +27,7 @@ interface ISpeechRecognition extends EventTarget {
   start(): void;
   stop(): void;
 }
-interface ISpeechRecognitionConstructor {
-  new (): ISpeechRecognition;
-}
+interface ISpeechRecognitionConstructor { new (): ISpeechRecognition; }
 
 function getSR(): ISpeechRecognitionConstructor | null {
   if (typeof window === "undefined") return null;
@@ -54,13 +52,46 @@ export default function RecordButton({
   onRecordingComplete,
   maxDurationSeconds = 600,
 }: RecordButtonProps) {
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+  const [hasSpeechSupport, setHasSpeechSupport] = useState(true);
+
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+    setHasSpeechSupport(!!getSR());
+  }, []);
+
+  // Avoid SSR/CSR mismatch — render nothing meaningful until we know
+  // which path to take (this resolves in a single render frame)
+  if (isMobile === null) {
+    return <div style={{ minHeight: 280 }} />;
+  }
+
+  // Mobile (or any browser without Web Speech support): real audio
+  // recording + server-side Deepgram transcription.
+  if (isMobile || !hasSpeechSupport) {
+    return (
+      <MobileAudioRecorder
+        onRecordingComplete={onRecordingComplete}
+        maxDurationSeconds={maxDurationSeconds}
+      />
+    );
+  }
+
+  // Desktop Chrome/Edge: live in-browser Web Speech API transcription.
+  return (
+    <DesktopRecordButton
+      onRecordingComplete={onRecordingComplete}
+      maxDurationSeconds={maxDurationSeconds}
+    />
+  );
+}
+
+function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: RecordButtonProps) {
   const [recState, setRecState] = useState<"idle" | "recording">("idle");
   const [timer, setTimer] = useState(0);
   const [bars, setBars] = useState<number[]>(Array(20).fill(8));
   const [error, setError] = useState<string | null>(null);
   const [liveTranscript, setLiveTranscript] = useState("");
-  const [noSpeechSupport, setNoSpeechSupport] = useState(false);
-  const [fallbackText, setFallbackText] = useState("");
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -72,13 +103,6 @@ export default function RecordButton({
   const transcriptRef = useRef("");
   const isStoppingRef = useRef(false);
   const stopRef = useRef<() => void>(() => {});
-
-  useEffect(() => {
-    // On mobile, Web Speech API support is unreliable across browsers/OSes
-    // (no support on iOS Safari, inconsistent on Android Chrome). Default
-    // straight to the paste-transcript fallback there.
-    if (!getSR() || isMobileDevice()) setNoSpeechSupport(true);
-  }, []);
 
   const animateWaveform = useCallback(() => {
     if (!analyserRef.current) return;
@@ -95,15 +119,8 @@ export default function RecordButton({
 
   const cleanupAll = useCallback(() => {
     isStoppingRef.current = true;
-
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-      animFrameRef.current = null;
-    }
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null; }
     if (recognitionRef.current) {
       recognitionRef.current.onend = null;
       recognitionRef.current.onresult = null;
@@ -111,17 +128,10 @@ export default function RecordButton({
       try { recognitionRef.current.stop(); } catch { /* already stopped */ }
       recognitionRef.current = null;
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (audioCtxRef.current) {
-      audioCtxRef.current.close().catch(() => {});
-      audioCtxRef.current = null;
-    }
+    if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
+    if (audioCtxRef.current) { audioCtxRef.current.close().catch(() => {}); audioCtxRef.current = null; }
     analyserRef.current = null;
     isStoppingRef.current = false;
-
     setBars(Array(20).fill(8));
     setLiveTranscript("");
     setRecState("idle");
@@ -130,19 +140,15 @@ export default function RecordButton({
   const stopRecording = useCallback(() => {
     const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
     const finalTranscript = transcriptRef.current;
-
     cleanupAll();
-
     if (!finalTranscript.trim()) {
-      setError("No speech detected. Please try again, or use the text box below.");
+      setError("No speech detected. Please try again.");
       return;
     }
     onRecordingComplete(finalTranscript.trim(), duration);
   }, [cleanupAll, onRecordingComplete]);
 
-  useEffect(() => {
-    stopRef.current = stopRecording;
-  }, [stopRecording]);
+  useEffect(() => { stopRef.current = stopRecording; }, [stopRecording]);
 
   useEffect(() => {
     return () => {
@@ -186,15 +192,11 @@ export default function RecordButton({
         recognitionRef.current = recognition;
 
         let finalTranscript = "";
-
         recognition.onresult = (e: ISpeechRecognitionEvent) => {
           let interim = "";
           for (let i = e.resultIndex; i < e.results.length; i++) {
-            if (e.results[i].isFinal) {
-              finalTranscript += e.results[i][0].transcript + " ";
-            } else {
-              interim += e.results[i][0].transcript;
-            }
+            if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + " ";
+            else interim += e.results[i][0].transcript;
           }
           transcriptRef.current = finalTranscript + interim;
           setLiveTranscript(transcriptRef.current);
@@ -204,13 +206,9 @@ export default function RecordButton({
           const err = e as unknown as { error: string };
           if (err.error === "aborted") return;
           if (err.error === "not-allowed" || err.error === "service-not-allowed") {
-            setError("Speech recognition permission was blocked by the browser. Try the text box below instead.");
+            setError("Speech recognition permission was blocked. Reload and allow access.");
           } else if (err.error === "network") {
-            setError("Speech recognition needs an internet connection. Check your connection and try again.");
-          } else if (err.error === "no-speech") {
-            // handled by stopRecording's empty-transcript check; ignore here
-          } else {
-            console.warn("Speech recognition error:", err);
+            setError("Speech recognition needs an internet connection.");
           }
         };
 
@@ -226,28 +224,22 @@ export default function RecordButton({
 
       startTimeRef.current = Date.now();
       setRecState("recording");
-
       timerRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
         setTimer(elapsed);
-        if (elapsed >= maxDurationSeconds) {
-          stopRef.current();
-        }
+        if (elapsed >= maxDurationSeconds) stopRef.current();
       }, 500);
-
       animFrameRef.current = requestAnimationFrame(animateWaveform);
     } catch (err: unknown) {
       const domErr = err as DOMException;
       if (domErr?.name === "NotAllowedError") {
-        setError(
-          "Microphone access is blocked. Click the lock icon in your browser's address bar, set Microphone to \"Allow\", then reload the page completely."
-        );
+        setError("Microphone access is blocked. Click the lock icon in your address bar, allow it, then reload.");
       } else if (domErr?.name === "NotFoundError") {
         setError("No microphone was found on this device.");
       } else if (domErr?.name === "NotReadableError") {
-        setError("Your microphone is being used by another app or browser tab. Close it and try again.");
+        setError("Your microphone is being used by another app. Close it and try again.");
       } else {
-        setError("Couldn't access the microphone. Please check your browser permissions and try again.");
+        setError("Couldn't access the microphone. Please check permissions and try again.");
       }
       cleanupAll();
     }
@@ -266,118 +258,78 @@ export default function RecordButton({
 
   const remaining = maxDurationSeconds - timer;
 
-  if (noSpeechSupport) {
-    return (
-      <div className="flex flex-col items-center gap-6 w-full max-w-md">
-        <p style={{ color: "#c96acb", fontFamily: "var(--font-syne)" }} className="text-sm text-center">
-          {isMobileDevice()
-            ? "Live transcription works best on desktop Chrome. Paste your transcript below instead."
-            : "Your browser doesn't support live transcription. Please use Chrome, or paste your transcript below."}
-        </p>
-        <textarea
-          value={fallbackText}
-          onChange={(e) => setFallbackText(e.target.value)}
-          placeholder="Paste your transcript here..."
-          style={{
-            background: "#0b0b0b", border: "1px solid #1a1a1a",
-            color: "#e5e5e5", fontFamily: "var(--font-inter)", resize: "none",
-          }}
-          className="w-full h-32 p-3 rounded-lg text-sm outline-none focus:border-[#c96acb]"
-        />
-        <button
-          onClick={() => {
-            if (!fallbackText.trim()) { setError("Please enter some text."); return; }
-            onRecordingComplete(fallbackText.trim(), 0);
-          }}
-          style={{ background: "#c96acb", fontFamily: "var(--font-syne)" }}
-          className="px-6 py-2 rounded-full text-white font-semibold text-sm"
-        >
-          Process Text
-        </button>
-        {error && <p className="text-red-400 text-xs text-center">{error}</p>}
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col items-center gap-8">
-      <div
-        className="flex items-end gap-1 transition-opacity duration-300"
-        style={{ height: 64, opacity: recState === "recording" ? 1 : 0 }}
-      >
+    <div className="flex flex-col items-center gap-7 w-full" style={{ maxWidth: 420 }}>
+      {recState === "recording" ? (
+        <div className="flex flex-col items-center gap-1">
+          <span style={{ fontFamily: "var(--font-inter)", fontSize: 12, fontWeight: 700, color: "#c96acb", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            Recording
+          </span>
+          <span style={{ fontFamily: "var(--font-syne)", fontSize: 48, fontWeight: 700, color: "#fff", letterSpacing: "0.01em" }}>
+            {formatTime(timer)}
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-2 md:hidden">
+          <div className="flex items-center justify-center rounded-full" style={{ width: 64, height: 64, background: "rgba(201,106,203,0.08)", border: "1px solid rgba(201,106,203,0.2)" }}>
+            <Mic size={26} style={{ color: "#c96acb" }} />
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-end gap-1 transition-opacity duration-300" style={{ height: 48, opacity: recState === "recording" ? 1 : 0 }}>
         {bars.map((h, i) => (
-          <div
-            key={i}
-            style={{
-              width: 4, height: h, background: "#c96acb",
-              borderRadius: 2, transition: "height 80ms ease",
-              opacity: 0.6 + (h / 64) * 0.4,
-            }}
-          />
+          <div key={i} style={{ width: 3.5, height: h * 0.85, background: "#c96acb", borderRadius: 3, transition: "height 80ms ease", opacity: 0.55 + (h / 64) * 0.45 }} />
         ))}
       </div>
 
-      <div className="relative flex items-center justify-center">
+      {recState === "recording" && liveTranscript && (
+        <div className="w-full rounded-2xl border" style={{ background: "#0e0a10", borderColor: "#1c1620", padding: "18px 18px" }}>
+          <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 700, color: "#c96acb", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
+            Live transcript
+          </p>
+          <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#a1a1aa", lineHeight: 1.7 }}>
+            &ldquo;{liveTranscript.slice(-180)}{liveTranscript.length > 180 ? "…" : ""}&rdquo;
+          </p>
+        </div>
+      )}
+
+      <div className="relative flex items-center justify-center" style={{ marginTop: recState === "recording" ? 4 : 8 }}>
         {recState === "recording" && (
-          <>
-            <div className="absolute rounded-full animate-ping" style={{ width: 120, height: 120, border: "2px solid #c96acb", opacity: 0.4 }} />
-            <div className="absolute rounded-full" style={{ width: 108, height: 108, border: "1.5px solid #c96acb", opacity: 0.2, animation: "pulse 2s ease-in-out infinite" }} />
-          </>
+          <div className="absolute rounded-full" style={{ width: 116, height: 116, border: "1.5px solid #c96acb", opacity: 0.35, animation: "pulse-ring 2s ease-in-out infinite" }} />
         )}
         {recState === "idle" && (
-          <div className="absolute rounded-full" style={{ width: 112, height: 112, border: "1.5px solid #c96acb", opacity: 0.3, animation: "idle-pulse 3s ease-in-out infinite" }} />
+          <div className="absolute rounded-full" style={{ width: 116, height: 116, border: "1.5px solid #c96acb", opacity: 0.3, animation: "idle-pulse 3s ease-in-out infinite" }} />
         )}
         <button
           onClick={handleClick}
           style={{
-            width: 96, height: 96, borderRadius: "50%",
-            background: recState === "recording" ? "#c96acb" : "transparent",
-            border: recState === "recording" ? "none" : "2px solid #c96acb",
-            cursor: "pointer",
+            width: 88, height: 88, borderRadius: "50%",
+            background: recState === "recording" ? "linear-gradient(145deg, #f87171, #ef4444)" : "linear-gradient(145deg, #d97fdb, #c96acb)",
+            border: "none", cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "all 0.3s ease", position: "relative", zIndex: 1,
+            transition: "transform 0.15s ease", position: "relative", zIndex: 1,
+            boxShadow: recState === "recording" ? "0 6px 24px rgba(239,68,68,0.4)" : "0 6px 24px rgba(201,106,203,0.4)",
           }}
+          className="active:scale-95"
           aria-label={recState === "idle" ? "Start recording" : "Stop recording"}
         >
-          {recState === "idle" ? (
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#c96acb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="23" />
-              <line x1="8" y1="23" x2="16" y2="23" />
-            </svg>
-          ) : (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
-              <rect x="4" y="4" width="16" height="16" rx="2" />
-            </svg>
-          )}
+          {recState === "idle" ? <Mic size={32} color="#0a0a0a" strokeWidth={2.2} /> : <Square size={26} color="#0a0a0a" fill="#0a0a0a" />}
         </button>
       </div>
 
-      {recState === "recording" && (
-        <div style={{ fontFamily: "var(--font-syne)", fontSize: 28, fontWeight: 600, color: "#c96acb", letterSpacing: "0.05em" }}>
-          {formatTime(timer)}
-        </div>
-      )}
-
-      <p style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "#555", letterSpacing: "0.03em" }}>
-        {recState === "idle" ? "Click to start recording" : "Click to stop"}
-      </p>
-
-      {recState === "recording" && liveTranscript && (
-        <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#444", maxWidth: 320, textAlign: "center", lineHeight: 1.6 }}>
-          {liveTranscript.slice(-120)}{liveTranscript.length > 120 ? "…" : ""}
-        </p>
+      {recState === "idle" && (
+        <p style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "#71717a" }}>Tap to start recording</p>
       )}
 
       {recState === "recording" && remaining <= 60 && (
-        <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#f87171" }}>
-          {remaining}s remaining — recording will stop automatically
+        <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#f87171", textAlign: "center" }}>
+          {remaining}s remaining — stops automatically
         </p>
       )}
 
       {error && (
-        <p style={{ color: "#f87171", fontFamily: "var(--font-inter)", fontSize: 13, textAlign: "center", maxWidth: 360, lineHeight: 1.6 }}>
+        <p style={{ color: "#f87171", fontFamily: "var(--font-inter)", fontSize: 13, textAlign: "center", maxWidth: 320, lineHeight: 1.6 }}>
           {error}
         </p>
       )}
@@ -390,6 +342,10 @@ export default function RecordButton({
         @keyframes idle-pulse {
           0%, 100% { transform: scale(1); opacity: 0.3; }
           50% { transform: scale(1.08); opacity: 0.15; }
+        }
+        @keyframes pulse-ring {
+          0%, 100% { transform: scale(1); opacity: 0.35; }
+          50% { transform: scale(1.06); opacity: 0.15; }
         }
       `}</style>
     </div>

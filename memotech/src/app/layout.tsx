@@ -9,6 +9,9 @@ export const metadata: Metadata = {
     "Record lectures, meetings, and conversations. Turn them into searchable knowledge with AI-powered summaries, tasks, flashcards, and memory recall.",
 };
 
+import DebugOverlay from "@/components/DebugOverlay";
+import GSAPMobileFixClient from "@/components/GSAPMobileFixClient";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -21,10 +24,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="antialiased">
+        <GSAPMobileFixClient />
         <ClerkProvider>
           <AmbientBackground />
           <div style={{ position: "relative", zIndex: 1 }}>
             {children}
+            <DebugOverlay />
           </div>
         </ClerkProvider>
       </body>

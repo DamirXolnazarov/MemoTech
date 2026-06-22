@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AudioLines } from "lucide-react";
 
 interface SessionSummary {
   id: string;
@@ -15,17 +16,6 @@ interface RecentSessionsProps {
   loading: boolean;
 }
 
-const tagColors: Record<string, string> = {
-  Summary: "rgba(201,106,203,0.12)",
-  Tasks: "rgba(245,158,11,0.12)",
-  Flashcards: "rgba(59,130,246,0.12)",
-};
-const tagText: Record<string, string> = {
-  Summary: "#c96acb",
-  Tasks: "#f59e0b",
-  Flashcards: "#60a5fa",
-};
-
 function formatRelativeDate(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
@@ -33,8 +23,10 @@ function formatRelativeDate(dateStr: string): string {
   const diffDays = Math.floor(diffMs / 86400000);
 
   if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "1 day ago";
-  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) {
+    return date.toLocaleDateString("en-US", { weekday: "short" });
+  }
   const weeks = Math.floor(diffDays / 7);
   if (weeks === 1) return "1 week ago";
   return `${weeks} weeks ago`;
@@ -42,95 +34,82 @@ function formatRelativeDate(dateStr: string): string {
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
-  const mins = Math.round(seconds / 60);
-  return `${mins} min`;
+  return `${Math.round(seconds / 60)} min`;
 }
 
 export default function RecentSessions({ sessions, loading }: RecentSessionsProps) {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-bold text-white" style={{ fontFamily: "var(--font-syne)", fontSize: 16 }}>
-          Recent Sessions
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between px-1">
+        <h2
+          className="font-bold"
+          style={{ fontFamily: "var(--font-syne)", fontSize: 17, color: "#fff" }}
+        >
+          Recent memories
         </h2>
         <Link
           href="/app/memories"
-          style={{ color: "#a1a1aa", fontSize: 13, fontFamily: "var(--font-inter)" }}
-          className="hover:text-white transition-colors"
+          style={{ color: "#c96acb", fontSize: 13, fontFamily: "var(--font-inter)", fontWeight: 500 }}
         >
-          View all →
+          View all
         </Link>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-4">
-          {[0, 1].map((i) => (
+        <div className="flex flex-col gap-2.5">
+          {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="rounded-xl border p-5"
-              style={{ background: "#0b0b0b", borderColor: "#1a1a1a", height: 130, opacity: 0.4 }}
+              className="rounded-2xl animate-pulse"
+              style={{ background: "#0e0a10", height: 72 }}
             />
           ))}
         </div>
       ) : sessions.length === 0 ? (
         <div
-          className="rounded-xl border flex flex-col items-center justify-center gap-2 py-12"
-          style={{ background: "#0b0b0b", borderColor: "#1a1a1a" }}
+          className="rounded-2xl border flex flex-col items-center justify-center gap-2 text-center"
+          style={{ background: "#0e0a10", borderColor: "#1c1620", padding: "40px 24px" }}
         >
-          <p style={{ color: "#555", fontSize: 14, fontFamily: "var(--font-inter)" }}>
-            No recordings yet
+          <AudioLines size={28} style={{ color: "#3a2f3f" }} strokeWidth={1.5} />
+          <p style={{ color: "#888", fontSize: 14, fontFamily: "var(--font-inter)", fontWeight: 500 }}>
+            No memories yet
           </p>
-          <p style={{ color: "#333", fontSize: 12, fontFamily: "var(--font-inter)" }}>
-            Your sessions will show up here once you record something
+          <p style={{ color: "#52525b", fontSize: 12, fontFamily: "var(--font-inter)" }}>
+            Record your first session to get started
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-2.5">
           {sessions.map((s) => (
-            <div
+            <Link
               key={s.id}
-              className="rounded-xl border p-5 flex flex-col gap-3 group"
-              style={{ background: "#0b0b0b", borderColor: "#1a1a1a" }}
+              href="/app/memories"
+              className="rounded-2xl border flex items-center gap-3 transition-colors active:scale-[0.98]"
+              style={{
+                background: "#0e0a10",
+                borderColor: "#1c1620",
+                padding: "14px 16px",
+                transition: "transform 0.15s ease",
+              }}
             >
-              <div className="flex flex-col gap-1">
-                <h3
-                  className="font-bold text-white leading-snug"
-                  style={{ fontFamily: "var(--font-syne)", fontSize: 14 }}
+              <div
+                className="flex items-center justify-center rounded-xl flex-shrink-0"
+                style={{ width: 44, height: 44, background: "rgba(201,106,203,0.1)" }}
+              >
+                <AudioLines size={18} style={{ color: "#c96acb" }} strokeWidth={2} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p
+                  className="font-bold truncate"
+                  style={{ fontFamily: "var(--font-syne)", fontSize: 15, color: "#fff" }}
                 >
                   {s.title}
-                </h3>
-                <p style={{ color: "#555", fontSize: 12, fontFamily: "var(--font-inter)" }}>
-                  {formatRelativeDate(s.date)} · {formatDuration(s.durationSeconds)}
+                </p>
+                <p style={{ color: "#71717a", fontSize: 13, fontFamily: "var(--font-inter)" }}>
+                  {formatDuration(s.durationSeconds)} · {formatRelativeDate(s.date)}
                 </p>
               </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                {s.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full px-2.5 py-0.5 text-xs font-medium"
-                    style={{
-                      background: tagColors[tag],
-                      color: tagText[tag],
-                      fontFamily: "var(--font-inter)",
-                      fontSize: 11,
-                    }}
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-
-              <div className="flex justify-end mt-auto pt-1">
-                <Link
-                  href="/app/memories"
-                  className="text-xs border rounded-lg px-3 py-1.5 transition-colors hover:border-[#c96acb] hover:text-[#c96acb]"
-                  style={{ borderColor: "#1f1f1f", color: "#555", fontFamily: "var(--font-inter)" }}
-                >
-                  Open
-                </Link>
-              </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

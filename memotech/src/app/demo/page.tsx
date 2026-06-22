@@ -86,9 +86,11 @@ export default function DemoPage() {
           </p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, width: "100%", maxWidth: 280 }}>
-          <button style={{ width: "100%", padding: "12px 24px", background: "#c96acb", border: "none", borderRadius: 10, fontFamily: "var(--font-syne)", fontSize: 14, fontWeight: 600, color: "#fff", cursor: "pointer" }}>
-            Get full access
-          </button>
+           <Link href="/signup" style={{ width: "100%", textDecoration: "none" }}>
+            <button style={{ width: "100%", padding: "12px 24px", background: "#c96acb", border: "none", borderRadius: 10, fontFamily: "var(--font-syne)", fontSize: 14, fontWeight: 600, color: "#fff", cursor: "pointer" }}>
+              Get full access
+            </button>
+          </Link>
           <Link href="/" style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "#444", textDecoration: "none" }}>
             Back to home
           </Link>

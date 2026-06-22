@@ -149,7 +149,7 @@ export default function MemoriesPage() {
 
         {/* Content */}
         {loading ? (
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(1, 1fr)" }}>
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
@@ -177,7 +177,7 @@ export default function MemoriesPage() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(1, 1fr)" }}>
             {filtered.map((s) => (
              <Link
   key={s.id}

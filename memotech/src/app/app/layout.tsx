@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Sidebar from "@/components/app/Sidebar";
+import MobileTabBar from "@/components/app/MobileTabBar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth();
@@ -8,10 +9,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen" style={{ background: "#050505" }}>
-      <Sidebar />
-      <main className="flex-1 min-h-screen" style={{ marginLeft: 240 }}>
+      {/* Desktop sidebar — hidden on mobile via CSS */}
+      <div className="hidden md:block">
+        <Sidebar />
+      </div>
+
+      <main className="flex-1 min-h-screen md:ml-[240px] pb-[calc(56px+env(safe-area-inset-bottom,0px))] md:pb-0">
         {children}
       </main>
+
+      <MobileTabBar />
     </div>
   );
 }
