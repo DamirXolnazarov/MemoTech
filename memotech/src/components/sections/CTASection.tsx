@@ -18,7 +18,7 @@ export function CTASection() {
             }}
           />
           <h2
-            className="relative z-10 text-[2.4rem] leading-[1.1] sm:text-5xl md:text-7xl font-extrabold"
+            className="relative z-10 text-[1.75rem] leading-[1.1] sm:text-5xl md:text-7xl font-extrabold"
             style={{ fontFamily: "var(--font-syne)", letterSpacing: "-0.04em" }}
           >
             Start remembering{" "}
