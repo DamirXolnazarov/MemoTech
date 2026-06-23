@@ -65,7 +65,11 @@ export default function MobileAudioRecorder({
       const formData = new FormData();
       const ext = mimeTypeRef.current.includes("mp4") ? "mp4" : "webm";
       formData.append("audio", blob, `chunk.${ext}`);
-      const res = await fetch("/api/transcribe", { method: "POST", body: formData });
+      const res = await fetch("/api/transcribe", {
+  method: "POST",
+  body: formData,
+  redirect: "follow",
+});
       if (!res.ok) return "";
       const data = await res.json();
       return data.transcript ?? "";

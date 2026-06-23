@@ -1,10 +1,6 @@
+// app/api/transcribe/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
-// POST /api/transcribe
-// Accepts an audio file (multipart/form-data, field name "audio") and
-// returns the transcribed text using Deepgram's pre-recorded transcription API.
-// Used as the mobile recording path, since the Web Speech API (live,
-// in-browser transcription) is unreliable on iOS Safari and Android Chrome.
 export async function POST(req: NextRequest) {
   try {
     if (!process.env.DEEPGRAM_API_KEY) {
@@ -25,12 +21,24 @@ export async function POST(req: NextRequest) {
     const audioBuffer = await audioFile.arrayBuffer();
     const mimeType = audioFile.type || "audio/webm";
 
+    console.log("[POST /api/transcribe] Received audio:", {
+      size: audioBuffer.byteLength,
+      type: mimeType,
+    });
+
+    if (audioBuffer.byteLength < 1000) {
+      return NextResponse.json(
+        { error: "Audio too short — please record for at least 2 seconds" },
+        { status: 422 }
+      );
+    }
+
     const res = await fetch(
       "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true",
       {
         method: "POST",
         headers: {
-          "Authorization": `Token ${process.env.DEEPGRAM_API_KEY}`,
+          Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
           "Content-Type": mimeType,
         },
         body: audioBuffer,
@@ -49,6 +57,8 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
     const transcript: string =
       data?.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? "";
+
+    console.log("[POST /api/transcribe] Transcript length:", transcript.length);
 
     if (!transcript.trim()) {
       return NextResponse.json(
