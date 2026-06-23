@@ -8,9 +8,6 @@ interface MobileAudioRecorderProps {
   maxDurationSeconds?: number;
 }
 
-// Send each chunk to Deepgram roughly this often. Keeps individual uploads
-// well under Vercel's 4.5MB serverless body limit and gives progressive
-// transcription feedback instead of one big upload at the end.
 const CHUNK_INTERVAL_MS = 60_000;
 
 function pickSupportedMimeType(): string {
@@ -61,97 +58,29 @@ export default function MobileAudioRecorder({
     }
   }, []);
 
-  useEffect(() => {
-    return () => cleanup();
-  }, [cleanup]);
+  useEffect(() => { return () => cleanup(); }, [cleanup]);
 
-  // Transcribe one audio chunk via /api/transcribe, returns the text
-  // (empty string on failure — caller decides whether that's fatal)
   const transcribeChunk = useCallback(async (blob: Blob): Promise<string> => {
     try {
       const formData = new FormData();
       const ext = mimeTypeRef.current.includes("mp4") ? "mp4" : "webm";
       formData.append("audio", blob, `chunk.${ext}`);
-
       const res = await fetch("/api/transcribe", { method: "POST", body: formData });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        console.error("Chunk transcription failed:", body?.error);
-        return "";
-      }
+      if (!res.ok) return "";
       const data = await res.json();
       return data.transcript ?? "";
-    } catch (err) {
-      console.error("Chunk transcription error:", err);
-      return "";
-    }
+    } catch { return ""; }
   }, []);
 
-  // Flush the current in-progress chunk (called periodically and on stop)
   const flushCurrentChunk = useCallback(async () => {
     if (currentChunkBlobs.current.length === 0) return;
     const blob = new Blob(currentChunkBlobs.current, { type: mimeTypeRef.current });
     currentChunkBlobs.current = [];
-
     setChunksTotal((n) => n + 1);
     const text = await transcribeChunk(blob);
     if (text) transcriptPartsRef.current.push(text);
     setChunksTranscribed((n) => n + 1);
   }, [transcribeChunk]);
-
-  const startRecording = useCallback(async () => {
-    setError(null);
-    transcriptPartsRef.current = [];
-    currentChunkBlobs.current = [];
-    setChunksTranscribed(0);
-    setChunksTotal(0);
-    stopRequestedRef.current = false;
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      const mimeType = pickSupportedMimeType();
-      mimeTypeRef.current = mimeType;
-
-      const recorder = new MediaRecorder(stream, { mimeType });
-      recorderRef.current = recorder;
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) currentChunkBlobs.current.push(e.data);
-      };
-
-      // Request data every second so we always have fresh chunks ready
-      // to flush on the chunk interval
-      recorder.start(1000);
-
-      startTimeRef.current = Date.now();
-      setTimer(0);
-      setRecState("recording");
-
-      timerRef.current = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-        setTimer(elapsed);
-        if (elapsed >= maxDurationSeconds) {
-          stopRecording();
-        }
-      }, 500);
-
-      chunkTimerRef.current = setInterval(() => {
-        flushCurrentChunk();
-      }, CHUNK_INTERVAL_MS);
-    } catch (err: unknown) {
-      const domErr = err as DOMException;
-      if (domErr?.name === "NotAllowedError") {
-        setError("Microphone access is blocked. Allow it in your browser settings, then reload.");
-      } else if (domErr?.name === "NotFoundError") {
-        setError("No microphone was found on this device.");
-      } else {
-        setError("Couldn't access the microphone. Please check permissions and try again.");
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxDurationSeconds, flushCurrentChunk]);
 
   const stopRecording = useCallback(async () => {
     if (stopRequestedRef.current) return;
@@ -161,15 +90,10 @@ export default function MobileAudioRecorder({
     if (chunkTimerRef.current) { clearInterval(chunkTimerRef.current); chunkTimerRef.current = null; }
 
     const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
-
     setRecState("transcribing");
 
-    // Stop the recorder and wait for the final ondataavailable to fire
     await new Promise<void>((resolve) => {
-      if (!recorderRef.current || recorderRef.current.state === "inactive") {
-        resolve();
-        return;
-      }
+      if (!recorderRef.current || recorderRef.current.state === "inactive") { resolve(); return; }
       recorderRef.current.onstop = () => resolve();
       recorderRef.current.stop();
     });
@@ -179,7 +103,6 @@ export default function MobileAudioRecorder({
       streamRef.current = null;
     }
 
-    // Flush any remaining audio as the final chunk
     await flushCurrentChunk();
 
     const fullTranscript = transcriptPartsRef.current.join(" ").trim();
@@ -189,14 +112,63 @@ export default function MobileAudioRecorder({
       setError("No speech detected. Please try again.");
       return;
     }
-
     onRecordingComplete(fullTranscript, duration);
   }, [flushCurrentChunk, onRecordingComplete]);
 
-  const handleClick = () => {
+  const startRecording = useCallback(async () => {
+    setError(null);
+    transcriptPartsRef.current = [];
+    currentChunkBlobs.current = [];
+    setChunksTranscribed(0);
+    setChunksTotal(0);
+    stopRequestedRef.current = false;
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err: unknown) {
+      const domErr = err as DOMException;
+      if (domErr?.name === "NotAllowedError") {
+        setError("Microphone access blocked. Allow it in your browser settings and reload.");
+      } else if (domErr?.name === "NotFoundError") {
+        setError("No microphone found on this device.");
+      } else {
+        setError(`Microphone error: ${domErr?.message ?? "unknown"}`);
+      }
+      return;
+    }
+
+    streamRef.current = stream;
+    const mimeType = pickSupportedMimeType();
+    mimeTypeRef.current = mimeType;
+
+    const recorder = new MediaRecorder(stream, { mimeType });
+    recorderRef.current = recorder;
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) currentChunkBlobs.current.push(e.data);
+    };
+
+    recorder.start(1000);
+    startTimeRef.current = Date.now();
+    setTimer(0);
+    setRecState("recording");
+
+    timerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      setTimer(elapsed);
+      if (elapsed >= maxDurationSeconds) stopRecording();
+    }, 500);
+
+    chunkTimerRef.current = setInterval(() => {
+      flushCurrentChunk();
+    }, CHUNK_INTERVAL_MS);
+  }, [maxDurationSeconds, flushCurrentChunk, stopRecording]);
+
+  const handleClick = useCallback(() => {
     if (recState === "idle") startRecording();
     else if (recState === "recording") stopRecording();
-  };
+  }, [recState, startRecording, stopRecording]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60).toString().padStart(2, "0");
@@ -206,6 +178,7 @@ export default function MobileAudioRecorder({
 
   return (
     <div className="flex flex-col items-center gap-7 w-full" style={{ maxWidth: 420 }}>
+
       {recState === "recording" && (
         <div className="flex flex-col items-center gap-1">
           <span style={{ fontFamily: "var(--font-inter)", fontSize: 12, fontWeight: 700, color: "#c96acb", letterSpacing: "0.12em", textTransform: "uppercase" }}>
@@ -224,35 +197,31 @@ export default function MobileAudioRecorder({
 
       {recState === "transcribing" && (
         <div className="flex flex-col items-center gap-3">
-          <div
-            className="rounded-full animate-spin"
-            style={{ width: 36, height: 36, border: "3px solid #2a1f2e", borderTopColor: "#c96acb" }}
-          />
+          <div className="rounded-full animate-spin" style={{ width: 36, height: 36, border: "3px solid #2a1f2e", borderTopColor: "#c96acb" }} />
           <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#a1a1aa" }}>
             Finishing transcription…
           </span>
         </div>
       )}
 
-      {recState === "idle" && (
-        null
-      )}
-
-      <div className="relative flex items-center justify-center">
+      {/* Button + rings */}
+      <div className="relative flex items-center justify-center" style={{ width: 120, height: 120 }}>
+        {/* Pulse rings — pointer-events-none so they never intercept taps */}
         {recState === "recording" && (
           <div
-            className="absolute rounded-full"
-            style={{ width: 116, height: 116, border: "1.5px solid #c96acb", opacity: 0.35, animation: "pulse-ring 2s ease-in-out infinite" }}
+            className="absolute inset-0 rounded-full pointer-events-none"
+            style={{ border: "1.5px solid #c96acb", opacity: 0.35, animation: "pulse-ring 2s ease-in-out infinite" }}
           />
         )}
         {recState === "idle" && (
           <div
-            className="absolute rounded-full"
-            style={{ width: 116, height: 116, border: "1.5px solid #c96acb", opacity: 0.3, animation: "idle-pulse 3s ease-in-out infinite" }}
+            className="absolute inset-0 rounded-full pointer-events-none"
+            style={{ border: "1.5px solid #c96acb", opacity: 0.3, animation: "idle-pulse 3s ease-in-out infinite" }}
           />
         )}
+
         <button
-          onClick={handleClick}
+          onPointerUp={handleClick}
           disabled={recState === "transcribing"}
           style={{
             width: 88, height: 88, borderRadius: "50%",
@@ -263,6 +232,9 @@ export default function MobileAudioRecorder({
             cursor: recState === "transcribing" ? "default" : "pointer",
             opacity: recState === "transcribing" ? 0.5 : 1,
             display: "flex", alignItems: "center", justifyContent: "center",
+            position: "relative", zIndex: 10,
+            WebkitTapHighlightColor: "transparent",
+            touchAction: "manipulation",
             transition: "transform 0.15s ease",
             boxShadow: recState === "recording"
               ? "0 6px 24px rgba(239,68,68,0.4)"
@@ -271,11 +243,9 @@ export default function MobileAudioRecorder({
           className="active:scale-95"
           aria-label={recState === "idle" ? "Start recording" : "Stop recording"}
         >
-          {recState === "idle" ? (
-            <Mic size={32} color="#0a0a0a" strokeWidth={2.2} />
-          ) : recState === "recording" ? (
-            <Square size={26} color="#0a0a0a" fill="#0a0a0a" />
-          ) : (
+          {recState === "idle" && <Mic size={32} color="#0a0a0a" strokeWidth={2.2} />}
+          {recState === "recording" && <Square size={26} color="#0a0a0a" fill="#0a0a0a" />}
+          {recState === "transcribing" && (
             <div className="rounded-full animate-spin" style={{ width: 24, height: 24, border: "2.5px solid rgba(10,10,10,0.3)", borderTopColor: "#0a0a0a" }} />
           )}
         </button>

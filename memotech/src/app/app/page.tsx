@@ -37,10 +37,7 @@ export default function DashboardPage() {
   const { user } = useUser();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Compute greeting/date only after mount to avoid SSR/CSR clock mismatch
-  // (server render time and client render time can land on different hours,
-  // causing a hydration error if computed during the render itself)
+  const [unreadCount, setUnreadCount] = useState(0);
   const [greeting, setGreeting] = useState<string | null>(null);
   const [today, setToday] = useState<string | null>(null);
 
@@ -51,7 +48,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
-
     async function fetchDashboard() {
       try {
         const res = await fetch("/api/dashboard");
@@ -64,12 +60,29 @@ export default function DashboardPage() {
         if (!cancelled) setLoading(false);
       }
     }
-
     fetchDashboard();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
+
+  // Seed notifications for existing users silently, then fetch unread count
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    async function initNotifications() {
+      try {
+        // seedWelcomeNotifications is idempotent — safe to call every mount,
+        // it no-ops if notifications already exist for this user
+        await fetch("/api/notifications/seed", { method: "POST" });
+        const res = await fetch("/api/notifications");
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const unread = (data.notifications as { read: boolean }[]).filter((n) => !n.read).length;
+        if (!cancelled) setUnreadCount(unread);
+      } catch { /* silent */ }
+    }
+    initNotifications();
+    return () => { cancelled = true; };
+  }, [user]);
 
   const stats = data?.stats ?? {
     totalMemories: 0,
@@ -84,7 +97,7 @@ export default function DashboardPage() {
     <div>
       {/* Desktop top bar */}
       <div className="hidden md:block">
-        <TopBar title="Dashboard" />
+        <TopBar title="Dashboard" unreadCount={unreadCount} />
       </div>
 
       {/* Mobile greeting header */}
@@ -100,15 +113,37 @@ export default function DashboardPage() {
             {today ?? ""}
           </p>
         </div>
-        <div
-          className="flex items-center justify-center rounded-full flex-shrink-0 overflow-hidden"
-          style={{ width: 40, height: 40, border: "1.5px solid rgba(201,106,203,0.4)" }}
-        >
-          {user?.imageUrl ? (
-            <img src={user.imageUrl} alt={firstName} className="w-full h-full object-cover" />
-          ) : (
-            <Circle size={18} style={{ color: "#c96acb" }} />
-          )}
+        <div className="flex items-center gap-3">
+          {/* Bell with badge — mobile */}
+          <Link
+            href="/app/notifications"
+            className="relative flex items-center justify-center rounded-xl"
+            style={{ width: 36, height: 36, background: "rgba(255,255,255,0.04)", border: "1px solid #1a1a1a" }}
+            aria-label="Notifications"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={unreadCount > 0 ? "#c96acb" : "#555"} strokeWidth={unreadCount > 0 ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            {unreadCount > 0 && (
+              <span
+                className="absolute flex items-center justify-center text-white font-bold rounded-full"
+                style={{ top: 4, right: 4, width: 14, height: 14, fontSize: 8, background: "#c96acb", fontFamily: "var(--font-inter)" }}
+              >
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </Link>
+          <div
+            className="flex items-center justify-center rounded-full flex-shrink-0 overflow-hidden"
+            style={{ width: 40, height: 40, border: "1.5px solid rgba(201,106,203,0.4)" }}
+          >
+            {user?.imageUrl ? (
+              <img src={user.imageUrl} alt={firstName} className="w-full h-full object-cover" />
+            ) : (
+              <Circle size={18} style={{ color: "#c96acb" }} />
+            )}
+          </div>
         </div>
       </div>
 

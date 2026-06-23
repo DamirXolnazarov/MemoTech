@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { Resend } from "resend";
 import WelcomeEmail from "@/emails/WelcomeEmail";
+import { seedWelcomeNotifications } from "@/lib/notifications";
 
 interface ClerkUserCreatedEvent {
   type: string;
@@ -23,16 +24,13 @@ export async function POST(req: NextRequest) {
   const svixId = req.headers.get("svix-id");
   const svixTimestamp = req.headers.get("svix-timestamp");
   const svixSignature = req.headers.get("svix-signature");
-
   if (!svixId || !svixTimestamp || !svixSignature) {
     return NextResponse.json({ error: "Missing svix headers" }, { status: 400 });
   }
 
   const payload = await req.text();
-
   const wh = new Webhook(webhookSecret);
   let event: ClerkUserCreatedEvent;
-
   try {
     event = wh.verify(payload, {
       "svix-id": svixId,
@@ -45,7 +43,6 @@ export async function POST(req: NextRequest) {
   }
 
   if (event.type !== "user.created") {
-    // Acknowledge other event types without acting on them
     return NextResponse.json({ received: true });
   }
 
@@ -59,11 +56,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
+  // Send welcome email
   try {
-    // Instantiated inside the handler, matching your established pattern
-    // for avoiding build-time crashes when RESEND_API_KEY is absent.
     const resend = new Resend(process.env.RESEND_API_KEY);
-
     await resend.emails.send({
       from: "onboarding@resend.dev",
       to: primaryEmail,
@@ -71,9 +66,14 @@ export async function POST(req: NextRequest) {
       react: WelcomeEmail({ firstName: data.first_name || "there" }),
     });
   } catch (err) {
-    // Log but still return 200 — Clerk will retry on non-2xx, and we
-    // don't want repeated webhook retries just because email send failed
     console.error("[clerk webhook] Failed to send welcome email:", err);
+  }
+
+  // Seed in-app notifications for this user
+  try {
+    await seedWelcomeNotifications(data.id, data.first_name || "");
+  } catch (err) {
+    console.error("[clerk webhook] Failed to seed notifications:", err);
   }
 
   return NextResponse.json({ received: true });

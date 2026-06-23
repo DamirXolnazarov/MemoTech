@@ -105,3 +105,26 @@ model ShareLinkSave {
   @@unique([shareLinkId, savedBy])
   @@index([savedBy])
 }
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      NotifType
+  title     String
+  body      String
+  read      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, read])
+}
+
+enum NotifType {
+  welcome
+  recording
+  task
+  system
+  pro
+  partnership
+  digest
+}

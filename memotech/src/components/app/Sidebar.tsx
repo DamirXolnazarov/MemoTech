@@ -12,6 +12,7 @@ import {
   Search,
   Settings,
   LogOut,
+  Bell,
 } from "lucide-react";
 
 const navItems = [
@@ -21,6 +22,7 @@ const navItems = [
   { label: "Tasks", href: "/app/tasks", icon: CheckSquare },
   { label: "Flashcards", href: "/app/flashcards", icon: CreditCard },
   { label: "Search", href: "/app/search", icon: Search },
+  { label: "Notifications", href: "/app/notifications", icon: Bell },
 ];
 
 export default function Sidebar() {
@@ -40,39 +42,21 @@ export default function Sidebar() {
       {/* Logo + User */}
       <div className="p-5 border-b" style={{ borderColor: "#1a1a1a" }}>
         <div className="flex items-center gap-2 mb-3">
-          <div
-            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-            style={{ background: "#c96acb" }}
-          />
-          <span
-            className="font-bold text-white"
-            style={{ fontFamily: "var(--font-syne)", fontSize: 18 }}
-          >
+          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: "#c96acb" }} />
+          <span className="font-bold text-white" style={{ fontFamily: "var(--font-syne)", fontSize: 18 }}>
             Memo
           </span>
           <span
             className="text-xs font-medium px-1.5 py-0.5 rounded"
-            style={{
-              background: "rgba(201,106,203,0.15)",
-              color: "#c96acb",
-              fontSize: 10,
-            }}
+            style={{ background: "rgba(201,106,203,0.15)", color: "#c96acb", fontSize: 10 }}
           >
             BETA
           </span>
         </div>
-
         {user && (
           <div className="flex items-center gap-2">
-            <img
-              src={user.imageUrl}
-              alt={user.fullName || "User"}
-              className="w-6 h-6 rounded-full flex-shrink-0"
-            />
-            <span
-              className="text-xs truncate"
-              style={{ color: "#a1a1aa", maxWidth: 160 }}
-            >
+            <img src={user.imageUrl} alt={user.fullName || "User"} className="w-6 h-6 rounded-full flex-shrink-0" />
+            <span className="text-xs truncate" style={{ color: "#a1a1aa", maxWidth: 160 }}>
               {user.fullName || user.emailAddresses[0]?.emailAddress}
             </span>
           </div>
@@ -101,10 +85,7 @@ export default function Sidebar() {
               />
               <span
                 className="text-sm font-medium"
-                style={{
-                  fontFamily: "var(--font-inter)",
-                  color: active ? "#c96acb" : "#a1a1aa",
-                }}
+                style={{ fontFamily: "var(--font-inter)", color: active ? "#c96acb" : "#a1a1aa" }}
               >
                 {label}
               </span>
@@ -120,25 +101,16 @@ export default function Sidebar() {
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 group"
           style={{
             color: pathname === "/app/settings" ? "#c96acb" : "#a1a1aa",
-            background:
-              pathname === "/app/settings"
-                ? "rgba(201,106,203,0.12)"
-                : "transparent",
+            background: pathname === "/app/settings" ? "rgba(201,106,203,0.12)" : "transparent",
           }}
         >
           <Settings size={16} style={{ color: "inherit" }} />
-          <span className="text-sm font-medium" style={{ fontFamily: "var(--font-inter)" }}>
-            Settings
-          </span>
+          <span className="text-sm font-medium" style={{ fontFamily: "var(--font-inter)" }}>Settings</span>
         </Link>
-
         <SignOutButton>
           <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 w-full text-left hover:bg-white/5">
             <LogOut size={16} style={{ color: "#a1a1aa" }} />
-            <span
-              className="text-sm font-medium"
-              style={{ color: "#a1a1aa", fontFamily: "var(--font-inter)" }}
-            >
+            <span className="text-sm font-medium" style={{ color: "#a1a1aa", fontFamily: "var(--font-inter)" }}>
               Sign out
             </span>
           </button>
