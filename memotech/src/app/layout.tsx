@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   title: "Memo — Never lose what matters.",
   description:
     "Record lectures, meetings, and conversations. Turn them into searchable knowledge with AI-powered summaries, tasks, flashcards, and memory recall.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 import GSAPMobileFixClient from "@/components/GSAPMobileFixClient";
