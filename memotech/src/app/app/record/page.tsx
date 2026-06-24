@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BookOpen, Briefcase, Lightbulb } from "lucide-react";
 import TopBar from "@/components/app/TopBar";
 import RecordButton from "@/components/app/RecordButton";
 import ProcessingScreen from "@/components/app/ProcessingScreen";
@@ -122,16 +123,16 @@ export default function RecordPage() {
           {/* Tip cards — desktop only, mobile keeps it minimal/focused like the mockup */}
           <div className="hidden md:grid grid-cols-3 gap-4 w-full mt-12" style={{ maxWidth: 560 }}>
             {[
-              { icon: "🎓", label: "Lectures", desc: "Capture every concept automatically" },
-              { icon: "💼", label: "Meetings", desc: "Extract tasks and decisions instantly" },
-              { icon: "💡", label: "Ideas", desc: "Think out loud, Memo structures it" },
-            ].map(({ icon, label, desc }) => (
+              { icon: BookOpen, label: "Lectures", desc: "Capture every concept automatically" },
+              { icon: Briefcase, label: "Meetings", desc: "Extract tasks and decisions instantly" },
+              { icon: Lightbulb, label: "Ideas", desc: "Think out loud, Memo structures it" },
+            ].map(({ icon: Icon, label, desc }) => (
               <div
                 key={label}
                 className="rounded-xl border p-4 text-center flex flex-col gap-1"
                 style={{ background: "#0b0b0b", borderColor: "#1a1a1a" }}
               >
-                <span style={{ fontSize: 20 }}>{icon}</span>
+                <Icon className="w-5 h-5 mx-auto text-white" />
                 <p className="font-semibold text-white" style={{ fontFamily: "var(--font-syne)", fontSize: 13 }}>
                   {label}
                 </p>

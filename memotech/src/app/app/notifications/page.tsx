@@ -46,7 +46,7 @@ const CTA_MAP: Record<NotifType, { label: string; href: string } | null> = {
   task:        { label: "Go to tasks →", href: "/app/tasks" },
   system:      null,
   pro:         { label: "Upgrade to Pro →", href: "/app/settings" },
-  partnership: { label: "Fill out the form →", href: "mailto:hello@memotech.app?subject=Partnership Interest" },
+  partnership: { label: "Fill out the form →", href: "mailto:damirbekx@tashschool.org?subject=Partnership Interest" },
   digest:      null,
 };
 
