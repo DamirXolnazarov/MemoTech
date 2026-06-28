@@ -6,16 +6,15 @@ import { Copy, Check, AlertTriangle } from "lucide-react";
 interface TranscriptTabProps {
   transcript: string;
 }
-
 interface FlaggedWord {
   index: number;
   word: string;
   suggestions: string[];
 }
-
 interface PopoverPos {
   top: number;
   left: number;
+  openUp: boolean;
 }
 
 export default function TranscriptTab({ transcript }: TranscriptTabProps) {
@@ -23,7 +22,7 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
   const [flagged, setFlagged] = useState<FlaggedWord[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [activePopover, setActivePopover] = useState<number | null>(null);
-  const [popoverPos, setPopoverPos] = useState<PopoverPos>({ top: 0, left: 0 });
+  const [popoverPos, setPopoverPos] = useState<PopoverPos>({ top: 0, left: 0, openUp: false });
   const [corrections, setCorrections] = useState<Record<number, string>>({});
   const [mounted, setMounted] = useState(false);
   const analyzed = useRef(false);
@@ -59,18 +58,28 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const POPOVER_HEIGHT = 160;
+
   const openPopover = useCallback((e: React.MouseEvent, globalIdx: number) => {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const popoverWidth = 200;
+    const popoverW = 200;
+
+    // Use fixed positioning — rect coords are already viewport-relative
     let left = rect.left;
-    // Clamp so popover doesn't overflow right edge
-    if (left + popoverWidth > window.innerWidth - 16) {
-      left = window.innerWidth - popoverWidth - 16;
+    if (left + popoverW > window.innerWidth - 16) {
+      left = window.innerWidth - popoverW - 16;
     }
+    if (left < 8) left = 8;
+
+    // Open upward if not enough space below
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUp = spaceBelow < POPOVER_HEIGHT + 16;
+
     setPopoverPos({
-      top: rect.bottom + window.scrollY + 6,
-      left: left + window.scrollX,
+      top: openUp ? rect.top - POPOVER_HEIGHT - 6 : rect.bottom + 6,
+      left,
+      openUp,
     });
     setActivePopover(globalIdx);
   }, []);
@@ -79,7 +88,6 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
   flagged.forEach((f) => flaggedMap.set(f.index, f));
   const unreviewedCount = flagged.filter((f) => !corrections[f.index]).length;
 
-  // Chunk tokens into timed segments
   const chunks: { startIdx: number; endIdx: number; ts: string }[] = [];
   let charCount = 0, chunkStart = 0, second = 0;
   for (let i = 0; i < tokens.length; i++) {
@@ -93,7 +101,6 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
     }
   }
 
-  // Active flagged entry for popover
   const activeEntry = activePopover !== null ? flaggedMap.get(activePopover) : null;
 
   return (
@@ -143,7 +150,7 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
         </div>
       )}
 
-      {/* Transcript scroll container */}
+      {/* Transcript */}
       <div style={{ background: "#0b0b0b", border: "1px solid #1a1a1a", borderRadius: 12, padding: "16px 20px", maxHeight: "55vh", overflowY: "auto" }}>
         {chunks.map((chunk, ci) => (
           <div key={ci} style={{ display: "flex", gap: 14, marginBottom: 18 }}>
@@ -154,12 +161,9 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
               {tokens.slice(chunk.startIdx, chunk.endIdx + 1).map((token, localIdx) => {
                 const globalIdx = chunk.startIdx + localIdx;
                 if (/^\s+$/.test(token)) return <span key={localIdx}>{token}</span>;
-
                 const isFlagged = flaggedMap.has(globalIdx) && !corrections[globalIdx];
                 const isCorrected = !!corrections[globalIdx];
-
                 if (!isFlagged && !isCorrected) return <span key={localIdx}>{token}</span>;
-
                 return (
                   <button
                     key={localIdx}
@@ -183,20 +187,14 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
         ))}
       </div>
 
-      {/* Portal popover — renders outside all scroll/overflow containers */}
+      {/* Portal popover — position: fixed so it's always in viewport coords */}
       {mounted && activePopover !== null && activeEntry && createPortal(
         <>
-          {/* Backdrop to close */}
-          <div
-            className="fixed inset-0"
-            style={{ zIndex: 9998 }}
-            onClick={() => setActivePopover(null)}
-          />
-          {/* Popover */}
+          <div className="fixed inset-0" style={{ zIndex: 9998 }} onClick={() => setActivePopover(null)} />
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              position: "absolute",
+              position: "fixed",
               top: popoverPos.top,
               left: popoverPos.left,
               zIndex: 9999,
@@ -205,13 +203,13 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
               borderRadius: 10,
               padding: "10px 12px",
               width: 200,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.8)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.85)",
               display: "flex",
               flexDirection: "column",
               gap: 6,
             }}
           >
-            <span style={{ fontFamily: "var(--font-inter)", fontSize: 10, color: "#444", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            <span style={{ fontFamily: "var(--font-inter)", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em" }}>
               Did you mean?
             </span>
             {activeEntry.suggestions.map((s) => (
