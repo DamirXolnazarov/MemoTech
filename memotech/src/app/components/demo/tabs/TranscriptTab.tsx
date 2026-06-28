@@ -237,6 +237,8 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
           </div>
         </>,
         document.body
+
+        
       )}
     </div>
   );
