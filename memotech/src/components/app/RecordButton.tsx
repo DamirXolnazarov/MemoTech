@@ -43,14 +43,20 @@ function isMobileDevice(): boolean {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
-interface RecordButtonProps {
+export interface RecordButtonProps {
   onRecordingComplete: (transcript: string, duration: number) => void;
   maxDurationSeconds?: number;
+  onStartRef?: (fn: () => void) => void;
+  onStopRef?: (fn: () => void) => void;
+  onRecordingStateChange?: (recording: boolean) => void;
 }
 
 export default function RecordButton({
   onRecordingComplete,
   maxDurationSeconds = 600,
+  onStartRef,
+  onStopRef,
+  onRecordingStateChange,
 }: RecordButtonProps) {
   const [isMobile, setIsMobile] = useState<boolean | null>(null);
   const [hasSpeechSupport, setHasSpeechSupport] = useState(true);
@@ -67,33 +73,38 @@ export default function RecordButton({
     return () => window.removeEventListener("resize", checkMobileStatus);
   }, [checkMobileStatus]);
 
-  // Avoid SSR/CSR mismatch — render nothing meaningful until we know
-  // which path to take (this resolves in a single render frame)
-  if (isMobile === null) {
-    return <div style={{ minHeight: 280 }} />;
-  }
+  if (isMobile === null) return <div style={{ minHeight: 280 }} />;
 
-  // Mobile (or any browser without Web Speech support): real audio
-  // recording + server-side Deepgram transcription.
   if (isMobile || !hasSpeechSupport) {
     return (
       <MobileAudioRecorder
         onRecordingComplete={onRecordingComplete}
         maxDurationSeconds={maxDurationSeconds}
+        onStartRef={onStartRef}
+        onStopRef={onStopRef}
+        onRecordingStateChange={onRecordingStateChange}
       />
     );
   }
 
-  // Desktop Chrome/Edge: live in-browser Web Speech API transcription.
   return (
     <DesktopRecordButton
       onRecordingComplete={onRecordingComplete}
       maxDurationSeconds={maxDurationSeconds}
+      onStartRef={onStartRef}
+      onStopRef={onStopRef}
+      onRecordingStateChange={onRecordingStateChange}
     />
   );
 }
 
-function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: RecordButtonProps) {
+function DesktopRecordButton({
+  onRecordingComplete,
+  maxDurationSeconds = 600,
+  onStartRef,
+  onStopRef,
+  onRecordingStateChange,
+}: RecordButtonProps) {
   const [recState, setRecState] = useState<"idle" | "recording">("idle");
   const [timer, setTimer] = useState(0);
   const [bars, setBars] = useState<number[]>(Array(20).fill(8));
@@ -132,7 +143,7 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
       recognitionRef.current.onend = null;
       recognitionRef.current.onresult = null;
       recognitionRef.current.onerror = null;
-      try { recognitionRef.current.stop(); } catch { /* already stopped */ }
+      try { recognitionRef.current.stop(); } catch { /* ok */ }
       recognitionRef.current = null;
     }
     if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
@@ -142,7 +153,8 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
     setBars(Array(20).fill(8));
     setLiveTranscript("");
     setRecState("idle");
-  }, []);
+    onRecordingStateChange?.(false);
+  }, [onRecordingStateChange]);
 
   const stopRecording = useCallback(() => {
     const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
@@ -156,21 +168,6 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
   }, [cleanupAll, onRecordingComplete]);
 
   useEffect(() => { stopRef.current = stopRecording; }, [stopRecording]);
-
-  useEffect(() => {
-    return () => {
-      isStoppingRef.current = true;
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      if (recognitionRef.current) {
-        recognitionRef.current.onend = null;
-        try { recognitionRef.current.stop(); } catch { /* ok */ }
-        recognitionRef.current = null;
-      }
-      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
-      if (audioCtxRef.current) audioCtxRef.current.close().catch(() => {});
-    };
-  }, []);
 
   const startRecording = useCallback(async () => {
     transcriptRef.current = "";
@@ -213,16 +210,14 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
           const err = e as unknown as { error: string };
           if (err.error === "aborted") return;
           if (err.error === "not-allowed" || err.error === "service-not-allowed") {
-            setError("Speech recognition permission was blocked. Reload and allow access.");
-          } else if (err.error === "network") {
-            setError("Speech recognition needs an internet connection.");
+            setError("Speech recognition permission was blocked.");
           }
         };
 
         recognition.onend = () => {
           if (isStoppingRef.current) return;
           if (recognitionRef.current) {
-            try { recognitionRef.current.start(); } catch { /* already started */ }
+            try { recognitionRef.current.start(); } catch { /* ok */ }
           }
         };
 
@@ -231,6 +226,8 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
 
       startTimeRef.current = Date.now();
       setRecState("recording");
+      onRecordingStateChange?.(true);
+
       timerRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
         setTimer(elapsed);
@@ -240,17 +237,33 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
     } catch (err: unknown) {
       const domErr = err as DOMException;
       if (domErr?.name === "NotAllowedError") {
-        setError("Microphone access is blocked. Click the lock icon in your address bar, allow it, then reload.");
+        setError("Microphone access blocked. Allow it in your browser settings.");
       } else if (domErr?.name === "NotFoundError") {
-        setError("No microphone was found on this device.");
-      } else if (domErr?.name === "NotReadableError") {
-        setError("Your microphone is being used by another app. Close it and try again.");
+        setError("No microphone found.");
       } else {
-        setError("Couldn't access the microphone. Please check permissions and try again.");
+        setError("Couldn't access the microphone.");
       }
       cleanupAll();
     }
-  }, [animateWaveform, maxDurationSeconds, cleanupAll]);
+  }, [animateWaveform, maxDurationSeconds, cleanupAll, onRecordingStateChange]);
+
+  // Expose start/stop to parent (for VoiceMode wake word)
+  useEffect(() => { onStartRef?.(startRecording); }, [startRecording, onStartRef]);
+  useEffect(() => { onStopRef?.(stopRecording); }, [stopRecording, onStopRef]);
+
+  useEffect(() => {
+    return () => {
+      isStoppingRef.current = true;
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (recognitionRef.current) {
+        recognitionRef.current.onend = null;
+        try { recognitionRef.current.stop(); } catch { /* ok */ }
+      }
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      if (audioCtxRef.current) audioCtxRef.current.close().catch(() => {});
+    };
+  }, []);
 
   const handleClick = () => {
     if (recState === "idle") startRecording();
@@ -267,7 +280,7 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
 
   return (
     <div className="flex flex-col items-center gap-7 w-full" style={{ maxWidth: 420 }}>
-      {recState === "recording" ? (
+      {recState === "recording" && (
         <div className="flex flex-col items-center gap-1">
           <span style={{ fontFamily: "var(--font-inter)", fontSize: 12, fontWeight: 700, color: "#c96acb", letterSpacing: "0.12em", textTransform: "uppercase" }}>
             Recording
@@ -276,7 +289,7 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
             {formatTime(timer)}
           </span>
         </div>
-      ) : null}
+      )}
 
       <div className="flex items-end gap-1 transition-opacity duration-300" style={{ height: 48, opacity: recState === "recording" ? 1 : 0 }}>
         {bars.map((h, i) => (
@@ -285,7 +298,7 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
       </div>
 
       {recState === "recording" && liveTranscript && (
-        <div className="w-full rounded-2xl border" style={{ background: "#0e0a10", borderColor: "#1c1620", padding: "18px 18px" }}>
+        <div className="w-full rounded-2xl border" style={{ background: "#0e0a10", borderColor: "#1c1620", padding: "18px" }}>
           <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 700, color: "#c96acb", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
             Live transcript
           </p>
@@ -295,12 +308,12 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
         </div>
       )}
 
-      <div className="relative flex items-center justify-center" style={{ marginTop: recState === "recording" ? 4 : 8 }}>
+      <div className="relative flex items-center justify-center" style={{ width: 120, height: 120 }}>
         {recState === "recording" && (
-          <div className="absolute rounded-full" style={{ width: 116, height: 116, border: "1.5px solid #c96acb", opacity: 0.35, animation: "pulse-ring 2s ease-in-out infinite" }} />
+          <div className="absolute inset-0 rounded-full pointer-events-none" style={{ border: "1.5px solid #c96acb", opacity: 0.35, animation: "pulse-ring 2s ease-in-out infinite" }} />
         )}
         {recState === "idle" && (
-          <div className="absolute rounded-full" style={{ width: 116, height: 116, border: "1.5px solid #c96acb", opacity: 0.3, animation: "idle-pulse 3s ease-in-out infinite" }} />
+          <div className="absolute inset-0 rounded-full pointer-events-none" style={{ border: "1.5px solid #c96acb", opacity: 0.3, animation: "idle-pulse 3s ease-in-out infinite" }} />
         )}
         <button
           onClick={handleClick}
@@ -309,7 +322,9 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
             background: recState === "recording" ? "linear-gradient(145deg, #f87171, #ef4444)" : "linear-gradient(145deg, #d97fdb, #c96acb)",
             border: "none", cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "transform 0.15s ease", position: "relative", zIndex: 1,
+            position: "relative", zIndex: 1,
+            WebkitTapHighlightColor: "transparent",
+            touchAction: "manipulation",
             boxShadow: recState === "recording" ? "0 6px 24px rgba(239,68,68,0.4)" : "0 6px 24px rgba(201,106,203,0.4)",
           }}
           className="active:scale-95"
@@ -325,7 +340,7 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
 
       {recState === "recording" && remaining <= 60 && (
         <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#f87171", textAlign: "center" }}>
-          {remaining}s remaining — stops automatically
+          {remaining}s remaining
         </p>
       )}
 
@@ -335,19 +350,9 @@ function DesktopRecordButton({ onRecordingComplete, maxDurationSeconds = 600 }: 
         </p>
       )}
 
-      <p style={{ fontSize: 11, color: "#333", fontFamily: "var(--font-inter)" }}>
-        Live transcription powered by your browser.
-      </p>
-
       <style>{`
-        @keyframes idle-pulse {
-          0%, 100% { transform: scale(1); opacity: 0.3; }
-          50% { transform: scale(1.08); opacity: 0.15; }
-        }
-        @keyframes pulse-ring {
-          0%, 100% { transform: scale(1); opacity: 0.35; }
-          50% { transform: scale(1.06); opacity: 0.15; }
-        }
+        @keyframes idle-pulse { 0%,100%{transform:scale(1);opacity:0.3} 50%{transform:scale(1.08);opacity:0.15} }
+        @keyframes pulse-ring { 0%,100%{transform:scale(1);opacity:0.35} 50%{transform:scale(1.06);opacity:0.15} }
       `}</style>
     </div>
   );

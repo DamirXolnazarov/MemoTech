@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Sidebar from "@/components/app/Sidebar";
+import ReportButton from "@/components/app/ReportButton";
 import MobileTabBar from "@/components/app/MobileTabBar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -19,6 +20,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </main>
 
       <MobileTabBar />
+<ReportButton />
+
     </div>
   );
 }

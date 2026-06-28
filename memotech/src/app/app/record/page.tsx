@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { BookOpen, Briefcase, Lightbulb } from "lucide-react";
 import TopBar from "@/components/app/TopBar";
 import RecordButton from "@/components/app/RecordButton";
 import ProcessingScreen from "@/components/app/ProcessingScreen";
 import SessionResults from "@/components/app/SessionResults";
+import VoiceMode from "@/components/app/VoiceMode";
 
-type Stage = "idle" | "processing" | "results";
+type Stage = "idle" | "recording" | "processing" | "results";
 
 interface ProcessedData {
   title: string;
@@ -26,12 +27,14 @@ export default function RecordPage() {
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  const startRef = useRef<(() => void) | null>(null);
+  const stopRef = useRef<(() => void) | null>(null);
+
   const handleRecordingComplete = async (t: string, d: number) => {
     setTranscript(t);
     setDuration(d);
     setStage("processing");
     setError(null);
-
     try {
       const res = await fetch("/api/process-recording", {
         method: "POST",
@@ -56,89 +59,82 @@ export default function RecordPage() {
     setError(null);
   };
 
+  const handleWakeWord = useCallback(() => {
+    if (stage === "idle" && startRef.current) {
+      startRef.current();
+      setStage("recording");
+    }
+  }, [stage]);
+
+  const handleStopWord = useCallback(() => {
+    if (stage === "recording" && stopRef.current) {
+      stopRef.current();
+    }
+  }, [stage]);
+
+  const isProcessing = (stage as string) === "processing";
+  const isRecording = (stage as string) === "recording";
+
   if (stage === "results" && processedData) {
     return (
       <>
-        <div className="hidden md:block">
-          <TopBar title="Record" />
-        </div>
-        <SessionResults
-          data={processedData}
-          transcript={transcript}
-          duration={duration}
-          onReset={handleReset}
-        />
+        <div className="hidden md:block"><TopBar title="Record" /></div>
+        <SessionResults data={processedData} transcript={transcript} duration={duration} onReset={handleReset} />
       </>
     );
   }
 
   return (
     <div>
-      <div className="hidden md:block">
-        <TopBar title="Record" />
-      </div>
+      <div className="hidden md:block"><TopBar title="Record" /></div>
 
-      {stage === "processing" ? (
+      {isProcessing ? (
         <div className="flex items-center justify-center" style={{ minHeight: "100vh" }}>
           <ProcessingScreen />
         </div>
       ) : (
-        <div
-          className="flex flex-col items-center"
-          style={{ minHeight: "100vh", padding: "32px 20px" }}
-        >
-          {/* Mobile-only minimal header, matches mockup's "RECORDING / 12:47" treatment
-              handled inside RecordButton itself once recording starts */}
-          <div className="md:hidden w-full text-center mb-2" style={{ marginTop: 8 }}>
-            <h2
-              className="font-bold"
-              style={{ fontFamily: "var(--font-syne)", fontSize: 22, color: "#fff" }}
-            >
-              New Recording
-            </h2>
-            <p style={{ color: "#71717a", fontSize: 13, fontFamily: "var(--font-inter)", marginTop: 4 }}>
-              Tap to start, speak freely
-            </p>
+        <div className="flex flex-col items-center gap-8" style={{ minHeight: "100vh", padding: "32px 20px" }}>
+          <div className="md:hidden w-full text-center" style={{ marginTop: 8 }}>
+            <h2 className="font-bold" style={{ fontFamily: "var(--font-syne)", fontSize: 22, color: "#fff" }}>New Recording</h2>
+            <p style={{ color: "#71717a", fontSize: 13, fontFamily: "var(--font-inter)", marginTop: 4 }}>Tap to start, or use voice mode</p>
           </div>
-
-          <div className="hidden md:block text-center mb-10">
-            <h2 className="font-bold text-white mb-2" style={{ fontFamily: "var(--font-syne)", fontSize: 28 }}>
-              New Recording
-            </h2>
-            <p style={{ color: "#555", fontSize: 14, fontFamily: "var(--font-inter)" }}>
-              Press record, speak freely. Memo handles the rest.
-            </p>
+          <div className="hidden md:block text-center">
+            <h2 className="font-bold text-white mb-2" style={{ fontFamily: "var(--font-syne)", fontSize: 28 }}>New Recording</h2>
+            <p style={{ color: "#555", fontSize: 14, fontFamily: "var(--font-inter)" }}>Press record, speak freely. Memo handles the rest.</p>
           </div>
 
           <div className="flex-1 flex items-center justify-center w-full">
-            <RecordButton onRecordingComplete={handleRecordingComplete} />
+            <RecordButton
+              onRecordingComplete={handleRecordingComplete}
+              onStartRef={(fn) => { startRef.current = fn; }}
+              onStopRef={(fn) => { stopRef.current = fn; }}
+              onRecordingStateChange={(recording) => { setStage(recording ? "recording" : "idle"); }}
+            />
+          </div>
+
+          <div className="w-full flex flex-col items-center gap-2" style={{ maxWidth: 420 }}>
+            <VoiceMode
+              onWakeWord={handleWakeWord}
+              onStopWord={handleStopWord}
+              isRecording={isRecording}
+              disabled={isProcessing}
+            />
           </div>
 
           {error && (
-            <p style={{ color: "#f87171", fontFamily: "var(--font-inter)", fontSize: 13, textAlign: "center", marginTop: 16 }}>
-              {error}
-            </p>
+            <p style={{ color: "#f87171", fontFamily: "var(--font-inter)", fontSize: 13, textAlign: "center" }}>{error}</p>
           )}
 
-          {/* Tip cards — desktop only, mobile keeps it minimal/focused like the mockup */}
-          <div className="hidden md:grid grid-cols-3 gap-4 w-full mt-12" style={{ maxWidth: 560 }}>
+          <div className="hidden md:grid grid-cols-3 gap-4 w-full" style={{ maxWidth: 560 }}>
             {[
               { icon: BookOpen, label: "Lectures", desc: "Capture every concept automatically" },
               { icon: Briefcase, label: "Meetings", desc: "Extract tasks and decisions instantly" },
               { icon: Lightbulb, label: "Ideas", desc: "Think out loud, Memo structures it" },
             ].map(({ icon: Icon, label, desc }) => (
-              <div
-                key={label}
-                className="rounded-xl border p-4 text-center flex flex-col gap-1"
-                style={{ background: "#0b0b0b", borderColor: "#1a1a1a" }}
-              >
+              <div key={label} className="rounded-xl border p-4 text-center flex flex-col gap-1" style={{ background: "#0b0b0b", borderColor: "#1a1a1a" }}>
                 <Icon className="w-5 h-5 mx-auto text-white" />
-                <p className="font-semibold text-white" style={{ fontFamily: "var(--font-syne)", fontSize: 13 }}>
-                  {label}
-                </p>
-                <p style={{ color: "#555", fontSize: 11, fontFamily: "var(--font-inter)", lineHeight: 1.5 }}>
-                  {desc}
-                </p>
+                <p className="font-semibold text-white" style={{ fontFamily: "var(--font-syne)", fontSize: 13 }}>{label}</p>
+                <p style={{ color: "#555", fontSize: 11, fontFamily: "var(--font-inter)", lineHeight: 1.5 }}>{desc}</p>
               </div>
             ))}
           </div>
