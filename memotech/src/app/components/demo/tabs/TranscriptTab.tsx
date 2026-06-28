@@ -1,6 +1,7 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
-import { Copy, Check, AlertTriangle, ChevronDown } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { Copy, Check, AlertTriangle } from "lucide-react";
 
 interface TranscriptTabProps {
   transcript: string;
@@ -12,15 +13,23 @@ interface FlaggedWord {
   suggestions: string[];
 }
 
+interface PopoverPos {
+  top: number;
+  left: number;
+}
+
 export default function TranscriptTab({ transcript }: TranscriptTabProps) {
   const [copied, setCopied] = useState(false);
   const [flagged, setFlagged] = useState<FlaggedWord[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [activePopover, setActivePopover] = useState<number | null>(null);
+  const [popoverPos, setPopoverPos] = useState<PopoverPos>({ top: 0, left: 0 });
   const [corrections, setCorrections] = useState<Record<number, string>>({});
+  const [mounted, setMounted] = useState(false);
   const analyzed = useRef(false);
 
-  // Split into tokens preserving whitespace
+  useEffect(() => { setMounted(true); }, []);
+
   const tokens = transcript.split(/(\s+)/);
 
   useEffect(() => {
@@ -50,25 +59,45 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const openPopover = useCallback((e: React.MouseEvent, globalIdx: number) => {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const popoverWidth = 200;
+    let left = rect.left;
+    // Clamp so popover doesn't overflow right edge
+    if (left + popoverWidth > window.innerWidth - 16) {
+      left = window.innerWidth - popoverWidth - 16;
+    }
+    setPopoverPos({
+      top: rect.bottom + window.scrollY + 6,
+      left: left + window.scrollX,
+    });
+    setActivePopover(globalIdx);
+  }, []);
+
   const flaggedMap = new Map<number, FlaggedWord>();
   flagged.forEach((f) => flaggedMap.set(f.index, f));
-
   const unreviewedCount = flagged.filter((f) => !corrections[f.index]).length;
 
   // Chunk tokens into timed segments
-  type Chunk = { startIdx: number; endIdx: number; ts: string };
-  const chunks: Chunk[] = [];
+  const chunks: { startIdx: number; endIdx: number; ts: string }[] = [];
   let charCount = 0, chunkStart = 0, second = 0;
   for (let i = 0; i < tokens.length; i++) {
     charCount += tokens[i].length;
     if (charCount >= 300 || i === tokens.length - 1) {
-      chunks.push({ startIdx: chunkStart, endIdx: i, ts: `${Math.floor(second / 60)}:${String(second % 60).padStart(2, "0")}` });
+      chunks.push({
+        startIdx: chunkStart, endIdx: i,
+        ts: `${Math.floor(second / 60)}:${String(second % 60).padStart(2, "0")}`,
+      });
       chunkStart = i + 1; charCount = 0; second += 30;
     }
   }
 
+  // Active flagged entry for popover
+  const activeEntry = activePopover !== null ? flaggedMap.get(activePopover) : null;
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" onClick={() => setActivePopover(null)}>
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2.5 flex-wrap">
@@ -77,15 +106,12 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
           </h2>
           {analyzing && (
             <span className="flex items-center gap-1.5" style={{ fontFamily: "var(--font-inter)", fontSize: 11, color: "#52525b" }}>
-              <div className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#52525b", borderTopColor: "transparent" }} />
+              <div className="w-3 h-3 rounded-full animate-spin" style={{ border: "2px solid #333", borderTopColor: "#c96acb" }} />
               Checking…
             </span>
           )}
           {!analyzing && unreviewedCount > 0 && (
-            <span
-              className="flex items-center gap-1 rounded-full px-2.5 py-0.5"
-              style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", fontFamily: "var(--font-inter)", fontSize: 11, color: "#f59e0b" }}
-            >
+            <span className="flex items-center gap-1 rounded-full px-2.5 py-0.5" style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", fontFamily: "var(--font-inter)", fontSize: 11, color: "#f59e0b" }}>
               <AlertTriangle size={10} />
               {unreviewedCount} {unreviewedCount === 1 ? "error" : "errors"}
             </span>
@@ -97,8 +123,8 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
           )}
         </div>
         <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
+          onClick={(e) => { e.stopPropagation(); handleCopy(); }}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5"
           style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: copied ? "#c96acb" : "#555", background: "transparent", border: "1px solid #1a1a1a", cursor: "pointer" }}
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
@@ -106,7 +132,7 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
         </button>
       </div>
 
-      {/* Accuracy note — only when errors found */}
+      {/* Accuracy note */}
       {!analyzing && unreviewedCount > 0 && (
         <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.12)" }}>
           <AlertTriangle size={13} color="#f59e0b" className="flex-shrink-0 mt-0.5" />
@@ -117,11 +143,11 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
         </div>
       )}
 
-      {/* Transcript body */}
+      {/* Transcript scroll container */}
       <div style={{ background: "#0b0b0b", border: "1px solid #1a1a1a", borderRadius: 12, padding: "16px 20px", maxHeight: "55vh", overflowY: "auto" }}>
         {chunks.map((chunk, ci) => (
           <div key={ci} style={{ display: "flex", gap: 14, marginBottom: 18 }}>
-            <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 11, color: "#2a2a2a", flexShrink: 0, paddingTop: 3, minWidth: 34 }}>
+            <span style={{ fontFamily: "monospace", fontSize: 11, color: "#2a2a2a", flexShrink: 0, paddingTop: 3, minWidth: 34 }}>
               {chunk.ts}
             </span>
             <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#888", lineHeight: 1.85, margin: 0, wordBreak: "break-word" }}>
@@ -131,79 +157,25 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
 
                 const isFlagged = flaggedMap.has(globalIdx) && !corrections[globalIdx];
                 const isCorrected = !!corrections[globalIdx];
-                const flagEntry = flaggedMap.get(globalIdx);
-                const isOpen = activePopover === globalIdx;
 
-                if (!isFlagged && !isCorrected) {
-                  return <span key={localIdx}>{token}</span>;
-                }
+                if (!isFlagged && !isCorrected) return <span key={localIdx}>{token}</span>;
 
                 return (
-                  <span key={localIdx} style={{ position: "relative", display: "inline" }}>
-                    <button
-                      onClick={() => setActivePopover(isOpen ? null : globalIdx)}
-                      style={{
-                        display: "inline",
-                        background: "none", border: "none", padding: 0,
-                        fontFamily: "inherit", fontSize: "inherit", lineHeight: "inherit",
-                        cursor: "pointer",
-                        color: isCorrected ? "#c96acb" : "#f0f0f0",
-                        borderBottom: isFlagged ? "2px solid #f59e0b" : "2px solid rgba(201,106,203,0.5)",
-                        WebkitTapHighlightColor: "transparent",
-                      }}
-                    >
-                      {corrections[globalIdx] ?? token}
-                    </button>
-
-                    {/* Inline popover — renders below the word, inside the flow */}
-                    {isOpen && flagEntry && (
-                      <span
-                        style={{
-                          position: "absolute",
-                          top: "calc(100% + 6px)",
-                          left: 0,
-                          zIndex: 100,
-                          background: "#161616",
-                          border: "1px solid #2a2a2a",
-                          borderRadius: 10,
-                          padding: "10px 12px",
-                          minWidth: 170,
-                          boxShadow: "0 4px 24px rgba(0,0,0,0.7)",
-                          display: "inline-flex",
-                          flexDirection: "column",
-                          gap: 5,
-                          // Clamp to right edge on mobile
-                          maxWidth: "min(220px, calc(100vw - 32px))",
-                        }}
-                      >
-                        <span style={{ fontFamily: "var(--font-inter)", fontSize: 10, color: "#444", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                          Did you mean?
-                        </span>
-                        {flagEntry.suggestions.map((s) => (
-                          <button
-                            key={s}
-                            onClick={(e) => { e.stopPropagation(); setCorrections((p) => ({ ...p, [globalIdx]: s })); setActivePopover(null); }}
-                            style={{
-                              fontFamily: "var(--font-inter)", fontSize: 13,
-                              color: "#c96acb", textAlign: "left",
-                              background: "rgba(201,106,203,0.08)",
-                              border: "1px solid rgba(201,106,203,0.15)",
-                              borderRadius: 6, padding: "4px 10px",
-                              cursor: "pointer",
-                            }}
-                          >
-                            {s}
-                          </button>
-                        ))}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setActivePopover(null); }}
-                          style={{ fontFamily: "var(--font-inter)", fontSize: 11, color: "#444", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", paddingTop: 2 }}
-                        >
-                          Keep original
-                        </button>
-                      </span>
-                    )}
-                  </span>
+                  <button
+                    key={localIdx}
+                    onClick={(e) => openPopover(e, globalIdx)}
+                    style={{
+                      display: "inline",
+                      background: "none", border: "none", padding: 0, margin: 0,
+                      fontFamily: "inherit", fontSize: "inherit", lineHeight: "inherit",
+                      cursor: "pointer",
+                      color: isCorrected ? "#c96acb" : "#f0f0f0",
+                      borderBottom: isFlagged ? "2px solid #f59e0b" : "2px solid rgba(201,106,203,0.4)",
+                      WebkitTapHighlightColor: "transparent",
+                    }}
+                  >
+                    {corrections[globalIdx] ?? token}
+                  </button>
                 );
               })}
             </p>
@@ -211,13 +183,62 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
         ))}
       </div>
 
-      {/* Close popover on outside tap */}
-      {activePopover !== null && (
-        <div
-          className="fixed inset-0 z-50"
-          onClick={() => setActivePopover(null)}
-          style={{ background: "transparent" }}
-        />
+      {/* Portal popover — renders outside all scroll/overflow containers */}
+      {mounted && activePopover !== null && activeEntry && createPortal(
+        <>
+          {/* Backdrop to close */}
+          <div
+            className="fixed inset-0"
+            style={{ zIndex: 9998 }}
+            onClick={() => setActivePopover(null)}
+          />
+          {/* Popover */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute",
+              top: popoverPos.top,
+              left: popoverPos.left,
+              zIndex: 9999,
+              background: "#161616",
+              border: "1px solid #2a2a2a",
+              borderRadius: 10,
+              padding: "10px 12px",
+              width: 200,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.8)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
+            <span style={{ fontFamily: "var(--font-inter)", fontSize: 10, color: "#444", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              Did you mean?
+            </span>
+            {activeEntry.suggestions.map((s) => (
+              <button
+                key={s}
+                onClick={() => { setCorrections((p) => ({ ...p, [activePopover]: s })); setActivePopover(null); }}
+                style={{
+                  fontFamily: "var(--font-inter)", fontSize: 13,
+                  color: "#c96acb", textAlign: "left",
+                  background: "rgba(201,106,203,0.08)",
+                  border: "1px solid rgba(201,106,203,0.15)",
+                  borderRadius: 6, padding: "5px 10px",
+                  cursor: "pointer",
+                }}
+              >
+                {s}
+              </button>
+            ))}
+            <button
+              onClick={() => setActivePopover(null)}
+              style={{ fontFamily: "var(--font-inter)", fontSize: 11, color: "#444", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", paddingTop: 2 }}
+            >
+              Keep original
+            </button>
+          </div>
+        </>,
+        document.body
       )}
     </div>
   );
