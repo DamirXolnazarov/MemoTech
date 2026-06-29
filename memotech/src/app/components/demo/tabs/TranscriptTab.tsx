@@ -68,8 +68,19 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
     e.stopPropagation();
     if (activePopover === globalIdx) { setActivePopover(null); return; }
     const rect = e.currentTarget.getBoundingClientRect();
-    const left = Math.min(rect.left, window.innerWidth - 216);
-    setPopoverStyle({ top: rect.bottom + 8, left: Math.max(left, 8) });
+    const POPOVER_WIDTH = 216;
+    const POPOVER_HEIGHT = 220; // approximate; used to decide above/below placement
+    // horizontal: keep popover within viewport with 8px padding
+    const rawLeft = rect.left;
+    const clampedLeft = Math.min(rawLeft, window.innerWidth - POPOVER_WIDTH - 8);
+    const left = Math.max(clampedLeft, 8);
+    // vertical: prefer below the word, but if it would overflow, position above
+    const preferBelowTop = rect.bottom + 8;
+    const preferAboveTop = rect.top - 8 - POPOVER_HEIGHT;
+    const top = (preferBelowTop + POPOVER_HEIGHT > window.innerHeight) && (preferAboveTop >= 8)
+      ? preferAboveTop
+      : preferBelowTop;
+    setPopoverStyle({ top, left });
     setActivePopover(globalIdx);
   };
 
@@ -161,14 +172,14 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
       {/* Portal popover — position fixed, always below the word */}
       {mounted && activePopover !== null && activeEntry && createPortal(
         <>
-          <div className="fixed inset-0" style={{ zIndex: 9990 }} onClick={() => setActivePopover(null)} />
+          <div className="fixed inset-0" style={{ zIndex: 999998 }} onClick={() => setActivePopover(null)} />
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
               position: "fixed",
               top: popoverStyle.top,
               left: popoverStyle.left,
-              zIndex: 9999,
+              zIndex: 999999,
               width: 200,
               background: "#161616",
               border: "1px solid #2a2a2a",
@@ -178,6 +189,11 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
               display: "flex",
               flexDirection: "column",
               gap: 6,
+              // ensure this popover renders above any transform-created stacking contexts
+              transform: "translateZ(0)",
+              WebkitTransform: "translateZ(0)",
+              // make sure pointer events reach the popover
+              pointerEvents: "auto",
             }}
           >
             <span style={{ fontFamily: "var(--font-inter)", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em" }}>
