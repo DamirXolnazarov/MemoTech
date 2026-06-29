@@ -18,6 +18,8 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
   const [analyzing, setAnalyzing] = useState(false);
   const [activePopover, setActivePopover] = useState<number | null>(null);
   const [popoverStyle, setPopoverStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const transcriptBoxRef = useRef<HTMLDivElement | null>(null);
+  const [extraPadding, setExtraPadding] = useState<{ top: number; bottom: number }>({ top: 0, bottom: 0 });
   const [corrections, setCorrections] = useState<Record<number, string>>({});
   const [mounted, setMounted] = useState(false);
   const analyzed = useRef(false);
@@ -84,6 +86,36 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
     setActivePopover(globalIdx);
   };
 
+  // When the popover is active, ensure the transcript container has enough padding
+  // so the popover isn't visually clipped by ancestor overflow. We compute how
+  // much padding to add to the top or bottom of the transcript box.
+  useEffect(() => {
+    const computePadding = () => {
+      const el = transcriptBoxRef.current;
+      if (!el || activePopover === null) {
+        setExtraPadding({ top: 0, bottom: 0 });
+        return;
+      }
+      const box = el.getBoundingClientRect();
+      const popTop = popoverStyle.top;
+      const popBottom = popTop + 220; // must match POPOVER_HEIGHT
+      let topPad = 0;
+      let bottomPad = 0;
+      if (popBottom > box.bottom) bottomPad = Math.ceil(popBottom - box.bottom + 12);
+      if (popTop < box.top) topPad = Math.ceil(box.top - popTop + 12);
+      setExtraPadding({ top: topPad, bottom: bottomPad });
+    };
+
+    computePadding();
+    const onResize = () => computePadding();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onResize, true);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onResize, true);
+    };
+  }, [activePopover, popoverStyle]);
+
   const activeEntry = activePopover !== null ? flaggedMap.get(activePopover) : null;
 
   return (
@@ -134,7 +166,20 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
       )}
 
       {/* Transcript scroll box */}
-      <div style={{ background: "#0b0b0b", border: "1px solid #1a1a1a", borderRadius: 12, padding: "16px 20px", maxHeight: "55vh", overflowY: "auto" }}>
+      <div
+        ref={transcriptBoxRef}
+        style={{
+          background: "#0b0b0b",
+          border: "1px solid #1a1a1a",
+          borderRadius: 12,
+          paddingTop: 16 + extraPadding.top,
+          paddingBottom: 16 + extraPadding.bottom,
+          paddingLeft: 20,
+          paddingRight: 20,
+          maxHeight: "55vh",
+          overflowY: "auto",
+        }}
+      >
         {chunks.map((chunk, ci) => (
           <div key={ci} style={{ display: "flex", gap: 14, marginBottom: 18 }}>
             <span style={{ fontFamily: "monospace", fontSize: 11, color: "#2a2a2a", flexShrink: 0, paddingTop: 3, minWidth: 34 }}>
