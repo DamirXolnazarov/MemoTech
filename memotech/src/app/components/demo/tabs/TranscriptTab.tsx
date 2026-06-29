@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Copy, Check, AlertTriangle } from "lucide-react";
 
@@ -11,18 +11,13 @@ interface FlaggedWord {
   word: string;
   suggestions: string[];
 }
-interface PopoverPos {
-  top: number;
-  left: number;
-  openUp: boolean;
-}
 
 export default function TranscriptTab({ transcript }: TranscriptTabProps) {
   const [copied, setCopied] = useState(false);
   const [flagged, setFlagged] = useState<FlaggedWord[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [activePopover, setActivePopover] = useState<number | null>(null);
-  const [popoverPos, setPopoverPos] = useState<PopoverPos>({ top: 0, left: 0, openUp: false });
+  const [popoverStyle, setPopoverStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [corrections, setCorrections] = useState<Record<number, string>>({});
   const [mounted, setMounted] = useState(false);
   const analyzed = useRef(false);
@@ -42,10 +37,7 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ transcript }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          setFlagged(data.flagged ?? []);
-        }
+        if (res.ok) setFlagged((await res.json()).flagged ?? []);
       } catch { /* silent */ }
       finally { setAnalyzing(false); }
     })();
@@ -58,32 +50,6 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const POPOVER_HEIGHT = 160;
-
-  const openPopover = useCallback((e: React.MouseEvent, globalIdx: number) => {
-    e.stopPropagation();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const popoverW = 200;
-
-    // Use fixed positioning — rect coords are already viewport-relative
-    let left = rect.left;
-    if (left + popoverW > window.innerWidth - 16) {
-      left = window.innerWidth - popoverW - 16;
-    }
-    if (left < 8) left = 8;
-
-    // Open upward if not enough space below
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const openUp = spaceBelow < POPOVER_HEIGHT + 16;
-
-    setPopoverPos({
-      top: openUp ? rect.top - POPOVER_HEIGHT - 6 : rect.bottom + 6,
-      left,
-      openUp,
-    });
-    setActivePopover(globalIdx);
-  }, []);
-
   const flaggedMap = new Map<number, FlaggedWord>();
   flagged.forEach((f) => flaggedMap.set(f.index, f));
   const unreviewedCount = flagged.filter((f) => !corrections[f.index]).length;
@@ -93,13 +59,19 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
   for (let i = 0; i < tokens.length; i++) {
     charCount += tokens[i].length;
     if (charCount >= 300 || i === tokens.length - 1) {
-      chunks.push({
-        startIdx: chunkStart, endIdx: i,
-        ts: `${Math.floor(second / 60)}:${String(second % 60).padStart(2, "0")}`,
-      });
+      chunks.push({ startIdx: chunkStart, endIdx: i, ts: `${Math.floor(second / 60)}:${String(second % 60).padStart(2, "0")}` });
       chunkStart = i + 1; charCount = 0; second += 30;
     }
   }
+
+  const handleWordClick = (e: React.MouseEvent<HTMLButtonElement>, globalIdx: number) => {
+    e.stopPropagation();
+    if (activePopover === globalIdx) { setActivePopover(null); return; }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const left = Math.min(rect.left, window.innerWidth - 216);
+    setPopoverStyle({ top: rect.bottom + 8, left: Math.max(left, 8) });
+    setActivePopover(globalIdx);
+  };
 
   const activeEntry = activePopover !== null ? flaggedMap.get(activePopover) : null;
 
@@ -113,14 +85,14 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
           </h2>
           {analyzing && (
             <span className="flex items-center gap-1.5" style={{ fontFamily: "var(--font-inter)", fontSize: 11, color: "#52525b" }}>
-              <div className="w-3 h-3 rounded-full animate-spin" style={{ border: "2px solid #333", borderTopColor: "#c96acb" }} />
+              <span className="w-3 h-3 rounded-full animate-spin inline-block" style={{ border: "2px solid #333", borderTopColor: "#c96acb" }} />
               Checking…
             </span>
           )}
           {!analyzing && unreviewedCount > 0 && (
             <span className="flex items-center gap-1 rounded-full px-2.5 py-0.5" style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", fontFamily: "var(--font-inter)", fontSize: 11, color: "#f59e0b" }}>
               <AlertTriangle size={10} />
-              {unreviewedCount} {unreviewedCount === 1 ? "error" : "errors"}
+              {unreviewedCount} {unreviewedCount === 1 ? "possible error" : "possible errors"}
             </span>
           )}
           {!analyzing && flagged.length > 0 && unreviewedCount === 0 && (
@@ -142,7 +114,7 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
       {/* Accuracy note */}
       {!analyzing && unreviewedCount > 0 && (
         <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.12)" }}>
-          <AlertTriangle size={13} color="#f59e0b" className="flex-shrink-0 mt-0.5" />
+          <AlertTriangle size={13} color="#f59e0b" style={{ flexShrink: 0, marginTop: 2 }} />
           <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#71717a", lineHeight: 1.5, margin: 0 }}>
             Due to accents or pronunciation, some words may be inaccurate.{" "}
             <span style={{ color: "#f59e0b" }}>Tap underlined words</span> to correct them.
@@ -150,7 +122,7 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
         </div>
       )}
 
-      {/* Transcript */}
+      {/* Transcript scroll box */}
       <div style={{ background: "#0b0b0b", border: "1px solid #1a1a1a", borderRadius: 12, padding: "16px 20px", maxHeight: "55vh", overflowY: "auto" }}>
         {chunks.map((chunk, ci) => (
           <div key={ci} style={{ display: "flex", gap: 14, marginBottom: 18 }}>
@@ -167,14 +139,13 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
                 return (
                   <button
                     key={localIdx}
-                    onClick={(e) => openPopover(e, globalIdx)}
+                    onClick={(e) => handleWordClick(e, globalIdx)}
                     style={{
-                      display: "inline",
-                      background: "none", border: "none", padding: 0, margin: 0,
-                      fontFamily: "inherit", fontSize: "inherit", lineHeight: "inherit",
-                      cursor: "pointer",
+                      display: "inline", background: "none", border: "none",
+                      padding: 0, margin: 0, fontFamily: "inherit",
+                      fontSize: "inherit", lineHeight: "inherit", cursor: "pointer",
                       color: isCorrected ? "#c96acb" : "#f0f0f0",
-                      borderBottom: isFlagged ? "2px solid #f59e0b" : "2px solid rgba(201,106,203,0.4)",
+                      borderBottom: isFlagged ? "2px solid #f59e0b" : "2px solid rgba(201,106,203,0.5)",
                       WebkitTapHighlightColor: "transparent",
                     }}
                   >
@@ -187,22 +158,22 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
         ))}
       </div>
 
-      {/* Portal popover — position: fixed so it's always in viewport coords */}
+      {/* Portal popover — position fixed, always below the word */}
       {mounted && activePopover !== null && activeEntry && createPortal(
         <>
-          <div className="fixed inset-0" style={{ zIndex: 9998 }} onClick={() => setActivePopover(null)} />
+          <div className="fixed inset-0" style={{ zIndex: 9990 }} onClick={() => setActivePopover(null)} />
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
               position: "fixed",
-              top: popoverPos.top,
-              left: popoverPos.left,
+              top: popoverStyle.top,
+              left: popoverStyle.left,
               zIndex: 9999,
+              width: 200,
               background: "#161616",
               border: "1px solid #2a2a2a",
               borderRadius: 10,
               padding: "10px 12px",
-              width: 200,
               boxShadow: "0 8px 32px rgba(0,0,0,0.85)",
               display: "flex",
               flexDirection: "column",
@@ -217,12 +188,10 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
                 key={s}
                 onClick={() => { setCorrections((p) => ({ ...p, [activePopover]: s })); setActivePopover(null); }}
                 style={{
-                  fontFamily: "var(--font-inter)", fontSize: 13,
-                  color: "#c96acb", textAlign: "left",
-                  background: "rgba(201,106,203,0.08)",
-                  border: "1px solid rgba(201,106,203,0.15)",
-                  borderRadius: 6, padding: "5px 10px",
-                  cursor: "pointer",
+                  fontFamily: "var(--font-inter)", fontSize: 13, color: "#c96acb",
+                  textAlign: "left", background: "rgba(201,106,203,0.08)",
+                  border: "1px solid rgba(201,106,203,0.15)", borderRadius: 6,
+                  padding: "5px 10px", cursor: "pointer",
                 }}
               >
                 {s}
@@ -237,8 +206,6 @@ export default function TranscriptTab({ transcript }: TranscriptTabProps) {
           </div>
         </>,
         document.body
-
-        
       )}
     </div>
   );
