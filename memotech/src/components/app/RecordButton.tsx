@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Square, Mic } from "lucide-react";
-import MobileAudioRecorder from "./MobileAudioRecorder";
+import MobileAudioRecorder, { pickSupportedMimeType } from "./MobileAudioRecorder";
 
 interface SpeechRecognitionResultItem { transcript: string; }
 interface SpeechRecognitionResult {
@@ -75,7 +75,7 @@ export default function RecordButton({
 
   if (isMobile === null) return <div style={{ minHeight: 280 }} />;
 
-  if (isMobile || !hasSpeechSupport) {
+  if (isMobile) {
     return (
       <MobileAudioRecorder
         onRecordingComplete={onRecordingComplete}
@@ -94,6 +94,7 @@ export default function RecordButton({
       onStartRef={onStartRef}
       onStopRef={onStopRef}
       onRecordingStateChange={onRecordingStateChange}
+      hasSpeechSupport={hasSpeechSupport}
     />
   );
 }
@@ -104,8 +105,9 @@ function DesktopRecordButton({
   onStartRef,
   onStopRef,
   onRecordingStateChange,
-}: RecordButtonProps) {
-  const [recState, setRecState] = useState<"idle" | "recording">("idle");
+  hasSpeechSupport,
+}: RecordButtonProps & { hasSpeechSupport: boolean }) {
+  const [recState, setRecState] = useState<"idle" | "recording" | "transcribing">("idle");
   const [timer, setTimer] = useState(0);
   const [bars, setBars] = useState<number[]>(Array(20).fill(8));
   const [error, setError] = useState<string | null>(null);
@@ -118,9 +120,14 @@ function DesktopRecordButton({
   const audioCtxRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
-  const transcriptRef = useRef("");
   const isStoppingRef = useRef(false);
+  const isTranscribingRef = useRef(false);
   const stopRef = useRef<() => void>(() => {});
+
+  // Real audio capture — this is the source of truth for the final transcript
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const mimeTypeRef = useRef<string>("");
 
   const animateWaveform = useCallback(() => {
     if (!analyserRef.current) return;
@@ -135,7 +142,9 @@ function DesktopRecordButton({
     animFrameRef.current = requestAnimationFrame(animateWaveform);
   }, []);
 
-  const cleanupAll = useCallback(() => {
+  // Hard-abort everything — used on unmount and on startup errors only.
+  // The normal stop path does NOT use this (it needs the recorder's final blob first).
+  const abortAll = useCallback(() => {
     isStoppingRef.current = true;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null; }
@@ -146,6 +155,11 @@ function DesktopRecordButton({
       try { recognitionRef.current.stop(); } catch { /* ok */ }
       recognitionRef.current = null;
     }
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      try { recorderRef.current.stop(); } catch { /* ok */ }
+    }
+    recorderRef.current = null;
+    audioChunksRef.current = [];
     if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
     if (audioCtxRef.current) { audioCtxRef.current.close().catch(() => {}); audioCtxRef.current = null; }
     analyserRef.current = null;
@@ -156,21 +170,73 @@ function DesktopRecordButton({
     onRecordingStateChange?.(false);
   }, [onRecordingStateChange]);
 
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback(async () => {
+    if (isTranscribingRef.current) return;
+    isTranscribingRef.current = true;
+    isStoppingRef.current = true;
+
     const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
-    const finalTranscript = transcriptRef.current;
-    cleanupAll();
-    if (!finalTranscript.trim()) {
+
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null; }
+    if (recognitionRef.current) {
+      recognitionRef.current.onend = null;
+      recognitionRef.current.onresult = null;
+      recognitionRef.current.onerror = null;
+      try { recognitionRef.current.stop(); } catch { /* ok */ }
+      recognitionRef.current = null;
+    }
+
+    setRecState("transcribing");
+    onRecordingStateChange?.(false);
+
+    // Wait for the recorder to flush its final blob
+    await new Promise<void>((resolve) => {
+      if (!recorderRef.current || recorderRef.current.state === "inactive") { resolve(); return; }
+      recorderRef.current.onstop = () => resolve();
+      recorderRef.current.stop();
+    });
+
+    if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
+    if (audioCtxRef.current) { audioCtxRef.current.close().catch(() => {}); audioCtxRef.current = null; }
+    analyserRef.current = null;
+
+    const mime = mimeTypeRef.current || "audio/webm";
+    const blob = new Blob(audioChunksRef.current, { type: mime });
+    audioChunksRef.current = [];
+
+    let transcript = "";
+    try {
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": blob.type || "audio/webm" },
+        body: blob,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        transcript = data.transcript ?? "";
+      }
+    } catch {
+      // fall through, handled by empty-transcript check below
+    }
+
+    isStoppingRef.current = false;
+    isTranscribingRef.current = false;
+    setBars(Array(20).fill(8));
+    setLiveTranscript("");
+    setRecState("idle");
+
+    if (!transcript.trim()) {
       setError("No speech detected. Please try again.");
       return;
     }
-    onRecordingComplete(finalTranscript.trim(), duration);
-  }, [cleanupAll, onRecordingComplete]);
+    onRecordingComplete(transcript.trim(), duration);
+  }, [onRecordingComplete, onRecordingStateChange]);
 
   useEffect(() => { stopRef.current = stopRecording; }, [stopRecording]);
 
   const startRecording = useCallback(async () => {
-    transcriptRef.current = "";
+    audioChunksRef.current = [];
     setError(null);
     setLiveTranscript("");
     setTimer(0);
@@ -187,6 +253,17 @@ function DesktopRecordButton({
       source.connect(analyser);
       analyserRef.current = analyser;
 
+      // Real audio recording — this is what actually gets transcribed
+      const mimeType = pickSupportedMimeType();
+      mimeTypeRef.current = mimeType;
+      const recorder = new MediaRecorder(micStream, mimeType ? { mimeType } : {});
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.start(1000);
+      recorderRef.current = recorder;
+
+      // Web Speech API — cosmetic live captions only, never used as the final transcript
       const SR = getSR();
       if (SR) {
         const recognition = new SR();
@@ -202,8 +279,7 @@ function DesktopRecordButton({
             if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + " ";
             else interim += e.results[i][0].transcript;
           }
-          transcriptRef.current = finalTranscript + interim;
-          setLiveTranscript(transcriptRef.current);
+          setLiveTranscript(finalTranscript + interim);
         };
 
         recognition.onerror = (e: Event) => {
@@ -243,11 +319,10 @@ function DesktopRecordButton({
       } else {
         setError("Couldn't access the microphone.");
       }
-      cleanupAll();
+      abortAll();
     }
-  }, [animateWaveform, maxDurationSeconds, cleanupAll, onRecordingStateChange]);
+  }, [animateWaveform, maxDurationSeconds, abortAll, onRecordingStateChange]);
 
-  // Expose start/stop to parent (for VoiceMode wake word)
   useEffect(() => { onStartRef?.(startRecording); }, [startRecording, onStartRef]);
   useEffect(() => { onStopRef?.(stopRecording); }, [stopRecording, onStopRef]);
 
@@ -260,6 +335,9 @@ function DesktopRecordButton({
         recognitionRef.current.onend = null;
         try { recognitionRef.current.stop(); } catch { /* ok */ }
       }
+      if (recorderRef.current && recorderRef.current.state !== "inactive") {
+        try { recorderRef.current.stop(); } catch { /* ok */ }
+      }
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
       if (audioCtxRef.current) audioCtxRef.current.close().catch(() => {});
     };
@@ -267,7 +345,7 @@ function DesktopRecordButton({
 
   const handleClick = () => {
     if (recState === "idle") startRecording();
-    else stopRecording();
+    else if (recState === "recording") stopRecording();
   };
 
   const formatTime = (s: number) => {
@@ -291,16 +369,23 @@ function DesktopRecordButton({
         </div>
       )}
 
+      {recState === "transcribing" && (
+        <div className="flex flex-col items-center gap-3">
+          <div className="rounded-full animate-spin" style={{ width: 36, height: 36, border: "3px solid #2a1f2e", borderTopColor: "#c96acb" }} />
+          <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#a1a1aa" }}>Transcribing…</span>
+        </div>
+      )}
+
       <div className="flex items-end gap-1 transition-opacity duration-300" style={{ height: 48, opacity: recState === "recording" ? 1 : 0 }}>
         {bars.map((h, i) => (
           <div key={i} style={{ width: 3.5, height: h * 0.85, background: "#c96acb", borderRadius: 3, transition: "height 80ms ease", opacity: 0.55 + (h / 64) * 0.45 }} />
         ))}
       </div>
 
-      {recState === "recording" && liveTranscript && (
+      {recState === "recording" && hasSpeechSupport && liveTranscript && (
         <div className="w-full rounded-2xl border" style={{ background: "#0e0a10", borderColor: "#1c1620", padding: "18px" }}>
           <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 700, color: "#c96acb", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
-            Live transcript
+            Live preview
           </p>
           <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#a1a1aa", lineHeight: 1.7 }}>
             &ldquo;{liveTranscript.slice(-180)}{liveTranscript.length > 180 ? "…" : ""}&rdquo;
@@ -317,10 +402,12 @@ function DesktopRecordButton({
         )}
         <button
           onClick={handleClick}
+          disabled={recState === "transcribing"}
           style={{
             width: 88, height: 88, borderRadius: "50%",
             background: recState === "recording" ? "linear-gradient(145deg, #f87171, #ef4444)" : "linear-gradient(145deg, #d97fdb, #c96acb)",
-            border: "none", cursor: "pointer",
+            border: "none", cursor: recState === "transcribing" ? "default" : "pointer",
+            opacity: recState === "transcribing" ? 0.5 : 1,
             display: "flex", alignItems: "center", justifyContent: "center",
             position: "relative", zIndex: 1,
             WebkitTapHighlightColor: "transparent",
@@ -330,7 +417,11 @@ function DesktopRecordButton({
           className="active:scale-95"
           aria-label={recState === "idle" ? "Start recording" : "Stop recording"}
         >
-          {recState === "idle" ? <Mic size={32} color="#0a0a0a" strokeWidth={2.2} /> : <Square size={26} color="#0a0a0a" fill="#0a0a0a" />}
+          {recState === "idle" && <Mic size={32} color="#0a0a0a" strokeWidth={2.2} />}
+          {recState === "recording" && <Square size={26} color="#0a0a0a" fill="#0a0a0a" />}
+          {recState === "transcribing" && (
+            <div className="rounded-full animate-spin" style={{ width: 24, height: 24, border: "2.5px solid rgba(10,10,10,0.3)", borderTopColor: "#0a0a0a" }} />
+          )}
         </button>
       </div>
 
@@ -351,7 +442,7 @@ function DesktopRecordButton({
       )}
 
       <style>{`
-        @keyframes idle-pulse { 0%,100%{transform:scale(1);opacity:0.3} 50%{transform:scale(1.08);opacity:0.15} }
+        @keyframes idle-pulse { 0%,100%{transform:scale(1);opacity:0.3} 50%{transform:scale(1.08);opacity:0.15}}
         @keyframes pulse-ring { 0%,100%{transform:scale(1);opacity:0.35} 50%{transform:scale(1.06);opacity:0.15} }
       `}</style>
     </div>

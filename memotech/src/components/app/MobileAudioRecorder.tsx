@@ -11,9 +11,7 @@ interface MobileAudioRecorderProps {
   onRecordingStateChange?: (recording: boolean) => void;
 }
 
-const CHUNK_INTERVAL_MS = 60_000;
-
-function pickSupportedMimeType(): string {
+export function pickSupportedMimeType(): string {
   if (typeof MediaRecorder === "undefined") return "audio/webm";
   const candidates = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
   for (const type of candidates) {
@@ -32,21 +30,17 @@ export default function MobileAudioRecorder({
   const [recState, setRecState] = useState<"idle" | "recording" | "transcribing">("idle");
   const [timer, setTimer] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [liveText, setLiveText] = useState("");
 
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const chunkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
-  const currentChunkBlobs = useRef<Blob[]>([]);
-  const transcriptPartsRef = useRef<string[]>([]);
+  const allChunksRef = useRef<Blob[]>([]);
   const mimeTypeRef = useRef<string>("");
   const stopRequestedRef = useRef(false);
 
   const cleanup = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    if (chunkTimerRef.current) { clearInterval(chunkTimerRef.current); chunkTimerRef.current = null; }
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       try { recorderRef.current.stop(); } catch { /* ok */ }
     }
@@ -56,36 +50,26 @@ export default function MobileAudioRecorder({
 
   useEffect(() => { return () => cleanup(); }, [cleanup]);
 
-  const transcribeChunk = useCallback(async (blob: Blob): Promise<string> => {
+  const transcribeFullRecording = useCallback(async (blob: Blob): Promise<string> => {
     try {
       const res = await fetch("/api/transcribe", {
         method: "POST",
         headers: { "Content-Type": blob.type || "audio/webm" },
         body: blob,
-        redirect: "follow",
       });
       if (!res.ok) return "";
       const data = await res.json();
-      const text = data.transcript ?? "";
-      if (text) setLiveText((prev) => prev ? prev + " " + text : text);
-      return text;
-    } catch { return ""; }
+      return data.transcript ?? "";
+    } catch {
+      return "";
+    }
   }, []);
-
-  const flushCurrentChunk = useCallback(async () => {
-    if (currentChunkBlobs.current.length === 0) return;
-    const mime = mimeTypeRef.current || "audio/webm";
-    const blob = new Blob(currentChunkBlobs.current, { type: mime });
-    currentChunkBlobs.current = [];
-    await transcribeChunk(blob);
-  }, [transcribeChunk]);
 
   const stopRecording = useCallback(async () => {
     if (stopRequestedRef.current) return;
     stopRequestedRef.current = true;
 
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    if (chunkTimerRef.current) { clearInterval(chunkTimerRef.current); chunkTimerRef.current = null; }
 
     const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
     setRecState("transcribing");
@@ -98,24 +82,25 @@ export default function MobileAudioRecorder({
     });
 
     if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
-    await flushCurrentChunk();
 
-    const fullTranscript = transcriptPartsRef.current.join(" ").trim() || liveText.trim();
+    const mime = mimeTypeRef.current || "audio/webm";
+    const fullBlob = new Blob(allChunksRef.current, { type: mime });
+    allChunksRef.current = [];
+
+    const transcript = await transcribeFullRecording(fullBlob);
+
     setRecState("idle");
-    setLiveText("");
 
-    if (!fullTranscript) {
+    if (!transcript.trim()) {
       setError("No speech detected. Please speak clearly and try again.");
       return;
     }
-    onRecordingComplete(fullTranscript, duration);
-  }, [flushCurrentChunk, onRecordingComplete, onRecordingStateChange, liveText]);
+    onRecordingComplete(transcript.trim(), duration);
+  }, [transcribeFullRecording, onRecordingComplete, onRecordingStateChange]);
 
   const startRecording = useCallback(async () => {
     setError(null);
-    setLiveText("");
-    transcriptPartsRef.current = [];
-    currentChunkBlobs.current = [];
+    allChunksRef.current = [];
     stopRequestedRef.current = false;
 
     let stream: MediaStream;
@@ -137,7 +122,7 @@ export default function MobileAudioRecorder({
     recorderRef.current = recorder;
 
     recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) currentChunkBlobs.current.push(e.data);
+      if (e.data && e.data.size > 0) allChunksRef.current.push(e.data);
     };
 
     recorder.start(1000);
@@ -151,11 +136,8 @@ export default function MobileAudioRecorder({
       setTimer(elapsed);
       if (elapsed >= maxDurationSeconds) stopRecording();
     }, 500);
+  }, [maxDurationSeconds, stopRecording, onRecordingStateChange]);
 
-    chunkTimerRef.current = setInterval(() => { flushCurrentChunk(); }, CHUNK_INTERVAL_MS);
-  }, [maxDurationSeconds, flushCurrentChunk, stopRecording, onRecordingStateChange]);
-
-  // Expose start/stop to parent for VoiceMode
   useEffect(() => { onStartRef?.(startRecording); }, [startRecording, onStartRef]);
   useEffect(() => { onStopRef?.(stopRecording); }, [stopRecording, onStopRef]);
 
@@ -180,17 +162,6 @@ export default function MobileAudioRecorder({
           <span style={{ fontFamily: "var(--font-syne)", fontSize: 48, fontWeight: 700, color: "#fff" }}>
             {formatTime(timer)}
           </span>
-        </div>
-      )}
-
-      {recState === "recording" && liveText && (
-        <div className="w-full rounded-2xl border p-4" style={{ background: "#0e0a10", borderColor: "#1c1620" }}>
-          <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 700, color: "#c96acb", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>
-            Transcript
-          </p>
-          <p style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "#a1a1aa", lineHeight: 1.7 }}>
-            {liveText.slice(-300)}{liveText.length > 300 ? "…" : ""}
-          </p>
         </div>
       )}
 
@@ -247,7 +218,7 @@ export default function MobileAudioRecorder({
       )}
 
       <style>{`
-        @keyframes idle-pulse { 0%,100%{transform:scale(1);opacity:0.3} 50%{transform:scale(1.08);opacity:0.15} }
+        @keyframes idle-pulse { 0%,100%{transform:scale(1);opacity:0.3} 50%{transform:scale(1.08);opacity:0.15}}
         @keyframes pulse-ring { 0%,100%{transform:scale(1);opacity:0.35} 50%{transform:scale(1.06);opacity:0.15} }
       `}</style>
     </div>

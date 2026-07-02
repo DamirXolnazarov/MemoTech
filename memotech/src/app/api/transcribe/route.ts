@@ -11,15 +11,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const formData = await req.formData();
-    const audioFile = formData.get("audio") as File | null;
-
-    if (!audioFile) {
-      return NextResponse.json({ error: "No audio file provided" }, { status: 400 });
-    }
-
-    const audioBuffer = await audioFile.arrayBuffer();
-    const mimeType = audioFile.type || "audio/webm";
+    // Client sends the raw audio blob as the request body (not multipart formData)
+    const mimeType = req.headers.get("content-type") || "audio/webm";
+    const audioBuffer = await req.arrayBuffer();
 
     console.log("[POST /api/transcribe] Received audio:", {
       size: audioBuffer.byteLength,
